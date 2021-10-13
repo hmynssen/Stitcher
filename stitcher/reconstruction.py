@@ -137,26 +137,19 @@ class Perimeter():
                     aux = np.delete(aux,j)
                     #self.points[j] += eta*(self.points[j]-self.points[j-1])
         self.points = aux
-    def c_clockwise(self, force_flip=False):
+    def area_vec(self):
+        for n in range(self.points.shape[0]-2):
+            v1 = self.points[n]-self.points[n+1]
+            v2 = self.points[n+1]-self.points[n+2]
+            cross = v1**v2
+            self.area += cross
+    def c_clockwise(self, global_orientation=Point(0,0,1)):
         ## Reorients surface to counter-clockwise
         ##and creates a area vector
         angle = 0
         if self.area.mod()==0:
-            self.area = Point(0,0,0)
-            for n in range(self.points.shape[0]-2):
-                v1 = self.points[n]-self.points[n+1]
-                v2 = self.points[n+1]-self.points[n+2]
-                self.area += v1**v2
-                dot = v1.dot(v2)
-                degree = dot/(v1.mod()*v2.mod())
-                angle += np.arccos(2*np.pi*degree/360)
-            self.area = (1/self.area.mod())*self.area
-
-        if force_flip:
-            self.points = np.flip(self.points,0)
-            self.area = -1*self.area
-            return
-        if angle<0:
+            self.area_vec()
+        if self.area.dot(global_orientation)<0:
             self.points = np.flip(self.points,0)
             self.area = -1*self.area
     def geometric_center(self) -> Point:
@@ -222,11 +215,11 @@ class Perimeter():
         '''
 
         p_points = self.points.shape[0]
-        Check = True
+        check = True
         Loops = 0   ## flexibility condition to avoid infinity
                     ##loops that may occur inside the while
 
-        while Check:
+        while check:
             found = False
             for i in range(p_points-3):
                 for j in range(i+2, p_points-1):
@@ -256,9 +249,9 @@ class Perimeter():
             ##Loop break if many intersections are encoutered
             Loops += 1
             if not found:
-                Check = False
+                check = False
             if Loops > 20:
-                Check = False
+                check = False
     def islands_ensemble(self, other):
         M = self.points.shape[0]-1
         N = other.points.shape[0]-1
@@ -360,10 +353,11 @@ class Perimeter():
 class Surface():
 
     def __init__(self):
-        self.slices = np.empty(0)
-        self._surface = False
-        self._intersection_range = 15
-        self.border_intersection = False
+        self.slices = np.empty(0) ##collection of Perimeters
+        self._surface = False ##Fully built surface
+        self._intersection_range = 15 ##not used
+        self.border_intersection = False ##
+        self.surface_orientation = Point(0,0,0)
 
     def create_island(self, npArray):
         #I = [Perimeter().append(npArray[i]) for i in range(npArray.shape[0])]
@@ -390,9 +384,13 @@ class Surface():
         self.surfaceV = "" ##3d reconstructed surface
         self.surfaceE = ""
         total_shift = 0
+        if self.slices[0].area.mod()==0:
+            self.slices[0].area_vec()
+        self.surface_orientation = self.slices[0].area
         for n in range(self.slices.shape[0]-1):
             print(n)
             dist_matrix =  self.__CostMatrix(self.slices[n],self.slices[n+1])
+            self.slices[n+1].c_clockwise(self.surface_orientation)
             '''
 
                 After reordering the both sequences of points, we need
@@ -410,29 +408,12 @@ class Surface():
             '''
             bad_connect = []
             rerun = False
-            check = False
-            limit = 1
+            limit = 10
 
             while not self.border_intersection:
                 if len(bad_connect) >= limit:
-                    if check:
-                        skip_intersection = True
-                        print("Skiping intersection check")
-                    else:
-                        if not rerun:
-                            self.slices[n+1].c_clockwise(True)
-                            dist_matrix =  self.__CostMatrix(self.slices[n],self.slices[n+1])
-                            bad_connect = []
-                            rerun = True
-                            limit = 10
-                        else:
-                            limit = 20
-                            check = True
-                            self.slices[n+1].c_clockwise(True)
-                            dist_matrix =  self.__CostMatrix(self.slices[n],self.slices[n+1])
-                            bad_connect = []
-
-
+                    skip_intersection = True
+                    print("Skiping intersection check")
                 else:
                     skip_intersection = False
 
@@ -446,7 +427,6 @@ class Surface():
                 final_min_cord = list_cordinates[0]
                 f0 = final_min_cord[0]
                 f1 = final_min_cord[1]
-
 
                 ## Re-order the points: put the first connection at (0,0)
                 reordered_upper =  self.__Reordering(
