@@ -31,13 +31,20 @@ Reconstruction of 3D Surfaces
               {"1":["f1.json","f2.json"],
                 "2":[["f3.json","f4i2.json"],"f5.json"]}
               ],
+              "CloseSurface": [
+              {"1":[0],
+                "2":[1]}
+              ],
               "FileDir": "/path/to/conturs/json",
               "OutputDir": "/path/to/out/put/mesh",
-              "DisplayConsoleStats": BOOLEAN,
-              "SaveFigureAutomatic": BOOLEAN,
               "MeshObjOutput": BOOLEAN}
 
-  On this example, the first plane contains only one island which is only connected to the island 'two' in the second plane. The second plane however has 3 islands and all of them will be connected to islands five and six in the third plane.
+  The "Stitches3D" key indicates which contours should be connect, and list means merging the contours only
+  in that subroutine.
+  The "CloseSurface" key indicates wherer to put a lid on, meaning a plane surface should
+  close fill that specific closed contour. Note that the count starts at 0!
+  In the given example, files f1 and f2 will stitched together and the plane triangulation to properly
+  close the 3d surface will be on files f1 and f5.
 
 # The Output
 
