@@ -111,21 +111,25 @@ class Perimeter():
                     aux = np.delete(aux,j)
                     #self.points[j] += eta*(self.points[j]-self.points[j-1])
         self.points = aux
+    def area_vec(self):
+        self.area = Point(0,0,0)
+        for n in range(self.points.shape[0]-2):
+            v1 = self.points[n]-self.points[n+1]
+            v2 = self.points[n+1]-self.points[n+2]
+            cross = v1**v2
+            self.area += cross
     def normal_vec(self):
 
         for n in range(self.points.shape[0]-1):
-            self.normal.x += (self.points[n].y - self.points[n+1].y) * (self.points[n].z - self.points[n+1].z)
-            self.normal.y += (self.points[n].z - self.points[n+1].z) * (self.points[n].x - self.points[n+1].x)
-            self.normal.z += (self.points[n].x - self.points[n+1].x) * (self.points[n].y - self.points[n+1].y)
+            self.normal.x += (self.points[n].y-self.points[n+1].y) * (self.points[n].z-self.points[n+1].z)
+            self.normal.y += (self.points[n].z-self.points[n+1].z) * (self.points[n].x-self.points[n+1].x)
+            self.normal.z += (self.points[n].x-self.points[n+1].x) * (self.points[n].y-self.points[n+1].y)
         self.normal = (1/self.normal.mod())*self.normal
     def c_clockwise(self, global_orientation=Point(1,0,0)):
         ## Reorients surface to counter-clockwise
         ##and creates a area vector
-        angle = 0
         if self.normal.mod()==0:
             self.normal_vec()
-        if self.normal.dot(global_orientation)==0:
-            global_orientation=Point(0,0,1)
         if self.normal.dot(global_orientation)<0:
             self.points = np.flip(self.points,0)
             self.normal = -1*self.normal
@@ -359,7 +363,7 @@ class Surface():
             out = 0
         else:
             error = 0
-    def build_surface(self):
+    def build_surface(self, close_list=[]):
         self.surfaceV = "" ##3d reconstructed surface
         self.surfaceE = ""
         total_shift = 0
@@ -511,14 +515,16 @@ class Surface():
             self.border_intersection = False
 
         self.surfaceV +=  self.__Vertices(self.slices[n+1].points)
-        #self.surfaceE += self.__CloseSurface(self.slices.shape[0]-1, total_shift)
-        #self.surfaceE += self.__CloseSurface(0) ##intial slice closure
+        for i in close_list:
+            self.surfaceE += self.__CloseSurface(i, total_shift)
         self.out_surface = True
     def super_resolution(self):
         self.super_surface
 
     ## Not meant for end-user
     def __CloseSurface(self, closing_index, shift=0):
+        if closing_index==0:
+            shift=0
         '''
             Slicing an ear using prune-and-search
 
@@ -677,13 +683,14 @@ class Surface():
                 edges += e1 + e2
             return edges
         number_points = self.slices[closing_index].points.shape[0]-1
-        normal = self.slices[closing_index].normal
+        self.slices[closing_index].area_vec()
+        area_vec = self.slices[closing_index].area
         points = np.array([[Point(0,0,0),0]]*number_points)
 
         for i in range(number_points):
             points[i][0] = self.slices[closing_index].points[i]
             points[i][1] = i+1 ##+1 to correct the .obj file format counting
-        edges = find_ear(points, points, shift, normal)
+        edges = find_ear(points, points, shift, area_vec)
 
         return edges
     def __CostMatrix(self, reordered_upper, reordered_lower) -> np.ndarray:

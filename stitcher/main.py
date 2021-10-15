@@ -30,13 +30,18 @@ def island_init(file_dir,f,subdivision=3):
     I = rct.Perimeter(arq)
     I.remove_overlap()
     I.remove_overlap()
-    I.fix_intersection()
+    I.normal_vec()
     I.fix_distance(subdivision=3)
-    I.c_clockwise()
     return I
 
 for block in Data["Stitches3D"]:
     for section in block:
+        try:
+            print(Data["CloseSurface"][0][str(section)])
+            close_list = Data["CloseSurface"][0][str(section)]
+        except:
+            close_list = []
+            print("No closure")
         S = rct.Surface()
         for file in block[section]:
             try:
@@ -56,8 +61,15 @@ for block in Data["Stitches3D"]:
                 print("Failed to load "+file)
 
         print("\nBuilding surface: ",section)
-        S.build_surface()
+        S.build_surface(close_list)
 
-        with open("Kamilla_interna_"+section+".obj", "w") as out_file:
+        with open("ventriculo_new_"+section+".obj", "w") as out_file:
             out_file.write(S.surfaceV)
             out_file.write(S.surfaceE)
+
+for block in Data["Stitches3D"]:
+    for section in block:
+        for file in block[section]:
+            with open("ventriculo_new_lid_"+section+".obj", "w") as out_file:
+                out_file.write(S.surfaceV)
+                out_file.write(S.surfaceE)
