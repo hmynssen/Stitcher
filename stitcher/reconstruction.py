@@ -42,7 +42,7 @@ class Point():
 class Perimeter():
 
     def __init__(self, *args):
-        self.area = Point(0,0,0)
+        self.normal = Point(0,0,0)
         if args:
             if not isinstance(args[0][0], Point):
                 ## np array of classes seems to point (memory level) at
@@ -64,32 +64,6 @@ class Perimeter():
 
     def append(self, np_array):
     	self.points = np.append(self.points, np.array([np_array]), axis=0)
-    def perimeter_fusion(self, attachment): ##not implemented
-        '''
-            Given a new perimeter (attachment), if we wish to connect them together
-        we could gather the to closest points of each and simply draw a line linking
-        them up.
-            However, to avoid surfaces intersection in the final 3D mesh, we could
-        acctually connect the (i-1,i+1) pair of points in the first perimeter to the
-        (j-1,j+1) pair on the seccond one, given that (i,j) is the line connecting
-        the nearest points from each perimeter.
-        '''
-        if not isinstance(attachment, Perimeter):
-            raise NameError("fusion_perimeter encountered a non Perimeter data type\nCould not fusion perimeters together.\nCheck for possible empty perimeter/contours.")
-        M = self.points.shape[0]
-        N = attachment.pointsshape[0]
-        dist = np.inf
-        for i in range(self.points.shape[0]):
-            for j in range(attachment.points.shape[0]):
-                pi = self.points[i]
-                pj = attachment.points[j]
-                if (pi-pj).mod() < dist:
-                    dist = (pi-pj).mod()
-                    nearest = [i,j]
-
-        final
-
-        return
     def fix_distance(self, subdivision = 3):
         ## Creates new points between points that are too
         ##far apart from each other
@@ -137,21 +111,24 @@ class Perimeter():
                     aux = np.delete(aux,j)
                     #self.points[j] += eta*(self.points[j]-self.points[j-1])
         self.points = aux
-    def area_vec(self):
-        for n in range(self.points.shape[0]-2):
-            v1 = self.points[n]-self.points[n+1]
-            v2 = self.points[n+1]-self.points[n+2]
-            cross = v1**v2
-            self.area += cross
-    def c_clockwise(self, global_orientation=Point(0,0,1)):
+    def normal_vec(self):
+
+        for n in range(self.points.shape[0]-1):
+            self.normal.x += (self.points[n].y - self.points[n+1].y) * (self.points[n].z - self.points[n+1].z)
+            self.normal.y += (self.points[n].z - self.points[n+1].z) * (self.points[n].x - self.points[n+1].x)
+            self.normal.z += (self.points[n].x - self.points[n+1].x) * (self.points[n].y - self.points[n+1].y)
+        self.normal = (1/self.normal.mod())*self.normal
+    def c_clockwise(self, global_orientation=Point(1,0,0)):
         ## Reorients surface to counter-clockwise
         ##and creates a area vector
         angle = 0
-        if self.area.mod()==0:
-            self.area_vec()
-        if self.area.dot(global_orientation)<0:
+        if self.normal.mod()==0:
+            self.normal_vec()
+        if self.normal.dot(global_orientation)==0:
+            global_orientation=Point(0,0,1)
+        if self.normal.dot(global_orientation)<0:
             self.points = np.flip(self.points,0)
-            self.area = -1*self.area
+            self.normal = -1*self.normal
     def geometric_center(self) -> Point:
         x = 0
         y = 0
@@ -255,6 +232,7 @@ class Perimeter():
     def islands_ensemble(self, other):
         M = self.points.shape[0]-1
         N = other.points.shape[0]-1
+        other.c_clockwise(self.normal)
         small_dist = np.inf
         for i in range(M):
             p_i = self.points[i]
@@ -358,6 +336,7 @@ class Surface():
         self._intersection_range = 15 ##not used
         self.border_intersection = False ##
         self.surface_orientation = Point(0,0,0)
+        self._intersection_counter = 0
 
     def create_island(self, npArray):
         #I = [Perimeter().append(npArray[i]) for i in range(npArray.shape[0])]
@@ -384,43 +363,14 @@ class Surface():
         self.surfaceV = "" ##3d reconstructed surface
         self.surfaceE = ""
         total_shift = 0
-        if self.slices[0].area.mod()==0:
-            self.slices[0].area_vec()
-        self.surface_orientation = self.slices[0].area
+        if self.slices[0].normal.mod()==0:
+            self.slices[0].normal_vec()
+        self.surface_orientation = self.slices[0].normal
         for n in range(self.slices.shape[0]-1):
             print(n)
-            dist_matrix =  self.__CostMatrix(self.slices[n],self.slices[n+1])
-            self.slices[n+1].c_clockwise(self.surface_orientation)
-            '''
 
-                After reordering the both sequences of points, we need
-            to a way to conect all in between points that represent a
-            surface that:
-                1) is not self intersecting
-                2) has the smallest possible area
-                3) is closed
-            -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
-                If we find a point that all of its connections create
-            intersections, than we must never use this point in our final
-            mesh. So we list all this points per stitched surface and exclude
-            them from our path find algorithm by setting its value to
-            infinity.
-            '''
-            bad_connect = []
-            rerun = False
-            limit = 10
+            def stitch_logic(upper, lower, skip_intersection, dist_matrix, bad_connect=[]):
 
-            while not self.border_intersection:
-                if len(bad_connect) >= limit:
-                    skip_intersection = True
-                    print("Skiping intersection check")
-                else:
-                    skip_intersection = False
-
-                ##After finding a path with o intersections
-                ## finding all min values contained inthe matrix
-                ##there's usually only one, but the value might
-                ##be repeated somewhere
                 closest_point_dist = np.amin(dist_matrix)
                 allMin = np.where(dist_matrix == closest_point_dist)
                 list_cordinates = list(zip(allMin[0], allMin[1]))
@@ -430,11 +380,11 @@ class Surface():
 
                 ## Re-order the points: put the first connection at (0,0)
                 reordered_upper =  self.__Reordering(
-                    self.slices[n],
-                    final_min_cord[0])
+                                                upper,
+                                                final_min_cord[0])
                 reordered_lower =  self.__Reordering(
-                    self.slices[n+1],
-                    final_min_cord[1])
+                                                lower,
+                                                final_min_cord[1])
 
                 cost_matrix =  self.__CostMatrix(reordered_upper,reordered_lower)
                 for bad in bad_connect:
@@ -448,7 +398,7 @@ class Surface():
                         bad2 = bad[1]+(self.slices[n+1].points.shape[0]-f1-1)
                     cost_matrix[bad1,bad2] = np.inf
 
-                mincost,the_path,wrong = self.__FindPath(
+                mincost,the_path,wrong,total_cost = self.__FindPath(
                     cost_matrix,
                     self.slices[n].points.shape[0],
                     self.slices[n+1].points.shape[0],
@@ -473,6 +423,72 @@ class Surface():
                         bad_connect.append([wrong[0],wrong[1]])
                 else:
                     dist_matrix[f0,f1] = np.inf
+
+                return mincost,the_path,wrong,total_cost,final_min_cord,dist_matrix
+
+            def orientation_match():
+
+                ## Could never figure out why putting everyone in the same orientation
+                ##doesn't fix orientation problems. So the solution is to try both
+                ##possible orientations and pick the best one
+                self.slices[n+1].c_clockwise(self.surface_orientation)
+                dist_matrix = self.__CostMatrix(self.slices[n],self.slices[n+1])
+                aux = stitch_logic(
+                        self.slices[n],
+                        self.slices[n+1],
+                        True,
+                        dist_matrix)
+                inter_memo1 = self._intersection_counter
+                self._intersection_counter = 0
+                self.slices[n+1].c_clockwise(-1*self.surface_orientation)
+
+                dist_matrix = self.__CostMatrix(self.slices[n],self.slices[n+1])
+                aux = stitch_logic(
+                        self.slices[n],
+                        self.slices[n+1],
+                        True,
+                        dist_matrix)
+                inter_memo2 = self._intersection_counter
+                if inter_memo2>inter_memo1:
+                    self.slices[n+1].c_clockwise(self.surface_orientation)
+                self._intersection_counter = 0
+                return
+
+            orientation_match()
+            dist_matrix = self.__CostMatrix(self.slices[n],self.slices[n+1])
+            self.border_intersection = False
+            '''
+
+                After reordering the both sequences of points, we need
+            to a way to conect all in between points that represent a
+            surface that:
+                1) is not self intersecting
+                2) has the smallest possible area
+                3) is closed
+            -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+                If we find a point that all of its connections create
+            intersections, than we must never use this point in our final
+            mesh. So we list all this points per stitched surface and exclude
+            them from our path find algorithm by setting its value to
+            infinity.
+            '''
+            bad_connect = []
+            rerun = False
+            limit = 100
+
+            while not self.border_intersection:
+                if len(bad_connect) >= limit:
+                    skip_intersection = True
+                    print("Skiping intersection check")
+                else:
+                    skip_intersection = False
+
+                mincost,the_path,wrong,total_cost,final_min_cord,dist_matrix = stitch_logic(
+                                                                                self.slices[n],
+                                                                                self.slices[n+1],
+                                                                                skip_intersection,
+                                                                                dist_matrix,
+                                                                                bad_connect)
 
             ## The path is calculated based on the reordered points,
             ##so we should invert the transformation so that we have
@@ -661,13 +677,13 @@ class Surface():
                 edges += e1 + e2
             return edges
         number_points = self.slices[closing_index].points.shape[0]-1
-        area_vec = self.slices[closing_index].area
+        normal = self.slices[closing_index].normal
         points = np.array([[Point(0,0,0),0]]*number_points)
 
         for i in range(number_points):
             points[i][0] = self.slices[closing_index].points[i]
             points[i][1] = i+1 ##+1 to correct the .obj file format counting
-        edges = find_ear(points, points, shift, area_vec)
+        edges = find_ear(points, points, shift, normal)
 
         return edges
     def __CostMatrix(self, reordered_upper, reordered_lower) -> np.ndarray:
@@ -702,8 +718,6 @@ class Surface():
                 return False
             if path_limit < 3:
                 return [-1,-1], False
-            if skip_intersection:
-                return [-1,-1], False
 
             ## if speed is needed in the future
             ##we may try limiting the search range
@@ -730,6 +744,9 @@ class Surface():
                 q1 = reordered_upper.points[a0]
                 q2 = reordered_lower.points[b0]
                 if line_triangle_intersection(q1, q2, p1, p2, p3):
+                    if skip_intersection:
+                        self._intersection_counter += 1
+                        return [-1,-1], False
                     return [a0,b0], True
 
             return [-1,-1], False
@@ -758,7 +775,7 @@ class Surface():
 
         ## Everything from now on is a way of finding what's the acctual path
         ##not only the cost of getting there.
-
+        total_cost = min_cost[M-1][N-1]
         var1 = False
         var2 = False
         the_path = np.array([[0,0]]*(M+N-2), dtype=int)
@@ -788,7 +805,7 @@ class Surface():
                                     skip_intersection)
                         if check2[1]:
                             ##[m,n] -> Bad point that always create intersection
-                            return 0,0,[m,n]
+                            return 0,0,[m,n],total_cost
                         else:
 
                             n = n - 1
@@ -796,7 +813,7 @@ class Surface():
                         if not min_cost[m-1][n] == np.inf:
                             m = m - 1
                         else:
-                            return 0,0,[m,n]
+                            return 0,0,[m,n],total_cost
                 else:
                     check = surface_intersection(the_path,
                                 index,
@@ -814,7 +831,7 @@ class Surface():
                                     reordered_lower,
                                     skip_intersection)
                         if check2[1]:
-                            return 0,0,[m,n]
+                            return 0,0,[m,n],total_cost
                         else:
                             m = m - 1
                             counter = 0
@@ -823,7 +840,7 @@ class Surface():
                             n = n - 1
                             counter = 0
                         else:
-                            return 0,0,[m,n]
+                            return 0,0,[m,n],total_cost
             else:
                 if m<=0:
                     check = surface_intersection(the_path,
@@ -834,7 +851,7 @@ class Surface():
                                 reordered_lower,
                                 skip_intersection)
                     if check[1]:
-                        return 0,0,[m,n]
+                        return 0,0,[m,n],total_cost
                     n = n - 1
                 else:
                     check = surface_intersection(the_path,
@@ -845,7 +862,7 @@ class Surface():
                                 reordered_lower,
                                 skip_intersection)
                     if check[1]:
-                        return 0,0,[m,n]
+                        return 0,0,[m,n],total_cost
                     m = m - 1
 
             the_path[index+1] = [m,n] ##+1 because of the insert before the loop
@@ -869,16 +886,16 @@ class Surface():
                 ### remove later
                 print("border0.1")
                 #####
-                return 0,0, [m,n]
+                return 0,0,[m,n],total_cost
 
             the_path = np.append(the_path, [[M-1,0]], axis=0)
             self.border_intersection = True
-            return [min_cost,the_path,0]
+            return [min_cost,the_path,0,total_cost]
         if var2:
             the_path = np.append(the_path, [[0,N-1]], axis=0)
             min_cost[min_cost.shape[0]-1,min_cost.shape[1]-1] += ofinal_matrix[0][N-1]
             self.border_intersection = True
-            return [min_cost,the_path,0]
+            return [min_cost,the_path,0,total_cost]
 
         if ofinal_matrix[M-1][0]<ofinal_matrix[0][N-1]:
             check = surface_intersection(the_path,
@@ -895,7 +912,7 @@ class Surface():
             the_path = np.append(the_path, [[M-1,0]], axis=0)
             min_cost[min_cost.shape[0]-1,min_cost.shape[1]-1] += ofinal_matrix[M-1][0]
             self.border_intersection = True
-            return [min_cost,the_path,0]
+            return [min_cost,the_path,0,total_cost]
         else:
             #print(M,N, the_path.shape)
             check = surface_intersection(the_path,
@@ -918,7 +935,7 @@ class Surface():
             the_path = np.append(the_path, [[0,N-1]], axis=0)
             min_cost[min_cost.shape[0]-1,min_cost.shape[1]-1] += ofinal_matrix[0][N-1]
             self.border_intersection = True
-            return [min_cost,the_path,0]
+            return [min_cost,the_path,0,total_cost]
     def __Reordering(self, contour, final_min_cord : int):
         M = contour.points.shape[0]
         reordered = [Point(0,0,0)]*M
