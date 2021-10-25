@@ -938,3 +938,35 @@ class Surface():
         return "Surface shape = {S}\nPerimeters shape = {L}".format(
                                             L = [self.slices[i].points.shape[0] for i in range(self.slices.shape[0])],
                                             S = (self.slices.shape[0]))
+
+
+if __name__=="__main__":
+    I = Perimeter()
+    I.append(Point(-4,6,0))
+    I.append(Point(0,2,0))
+    I.append(Point(2,5,0))
+    I.append(Point(7,0,0))
+    I.append(Point(5,-6,0))
+    I.append(Point(3,3,0))
+    I.append(Point(0,-5,0))
+    I.append(Point(-6,0,0))
+    I.append(Point(-2,1,0))
+    I.append(Point(-4,6,0))
+    I2 = Perimeter()
+    I2.append(Point(-4,6,1))
+    I2.append(Point(0,2,1))
+    I2.append(Point(2,5,1))
+    I2.append(Point(7,0,1))
+    I2.append(Point(5,-6,1))
+    I2.append(Point(3,3,1))
+    I2.append(Point(0,-5,1))
+    I2.append(Point(-6,0,1))
+    I2.append(Point(-2,1,1))
+    I2.append(Point(-4,6,1))
+    S = Surface()
+    S.add_island(I)
+    S.add_island(I2)
+    S.build_surface([0,1])
+    with open("gold_test4.obj", "w") as out_file:
+        out_file.write(S.surfaceV)
+        out_file.write(S.surfaceE)
