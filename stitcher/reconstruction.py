@@ -43,6 +43,7 @@ class Perimeter():
 
     def __init__(self, *args):
         self.normal = Point(0,0,0)
+        self.area = Point(0,0,0)
         if args:
             if not isinstance(args[0][0], Point):
                 ## np array of classes seems to point (memory level) at
@@ -113,11 +114,11 @@ class Perimeter():
         self.points = aux
     def area_vec(self):
         self.area = Point(0,0,0)
-        for n in range(self.points.shape[0]-2):
-            v1 = self.points[n]-self.points[n+1]
-            v2 = self.points[n+1]-self.points[n+2]
+        for n in range(1,self.points.shape[0]-1):
+            v1 = self.points[n]-self.points[0]
+            v2 = self.points[n+1]-self.points[0]
             cross = v1**v2
-            self.area += cross
+            self.area += cross*(1/2)
     def normal_vec(self):
 
         for n in range(self.points.shape[0]-1):
@@ -130,9 +131,11 @@ class Perimeter():
         ##and creates a area vector
         if self.normal.mod()==0:
             self.normal_vec()
-        if self.normal.dot(global_orientation)<0:
+        if self.area.mod()==0:
+            self.area_vec()
+        if self.area.dot(global_orientation)<0:
             self.points = np.flip(self.points,0)
-            self.normal = -1*self.normal
+            self.area = -1*self.area
     def geometric_center(self) -> Point:
         x = 0
         y = 0
@@ -367,102 +370,14 @@ class Surface():
         self.surfaceV = "" ##3d reconstructed surface
         self.surfaceE = ""
         total_shift = 0
-        if self.slices[0].normal.mod()==0:
-            self.slices[0].normal_vec()
-        self.surface_orientation = self.slices[0].normal
+        self.slices[0].area_vec()
+        self.surface_orientation = self.slices[0].area
         for n in range(self.slices.shape[0]-1):
             print(n)
-
-            def stitch_logic(upper, lower, skip_intersection, dist_matrix, bad_connect=[]):
-
-                closest_point_dist = np.amin(dist_matrix)
-                allMin = np.where(dist_matrix == closest_point_dist)
-                list_cordinates = list(zip(allMin[0], allMin[1]))
-                final_min_cord = list_cordinates[0]
-                f0 = final_min_cord[0]
-                f1 = final_min_cord[1]
-
-                ## Re-order the points: put the first connection at (0,0)
-                reordered_upper =  self.__Reordering(
-                                                upper,
-                                                final_min_cord[0])
-                reordered_lower =  self.__Reordering(
-                                                lower,
-                                                final_min_cord[1])
-
-                cost_matrix =  self.__CostMatrix(reordered_upper,reordered_lower)
-                for bad in bad_connect:
-                    if bad[0]>=f0:
-                        bad1 = bad[0]-f0
-                    else:
-                        bad1 = bad[0]+(self.slices[n].points.shape[0]-f0-1)
-                    if bad[1]>=f1:
-                        bad2 = bad[1]-f1
-                    else:
-                        bad2 = bad[1]+(self.slices[n+1].points.shape[0]-f1-1)
-                    cost_matrix[bad1,bad2] = np.inf
-
-                mincost,the_path,wrong,total_cost = self.__FindPath(
-                    cost_matrix,
-                    self.slices[n].points.shape[0],
-                    self.slices[n+1].points.shape[0],
-                    reordered_upper,
-                    reordered_lower,
-                    skip_intersection)
-
-                ##fixing relative order to absolute/initial order
-                if not isinstance(wrong, int):
-                    if wrong[0]+f0 <= self.slices[n].points.shape[0]-2:
-                        wrong[0] += f0
-                    else:
-                        wrong[0] += f0-self.slices[n].points.shape[0]-2
-
-                    if wrong[1]+f1 <= self.slices[n+1].points.shape[0]-2:
-                        wrong[1] += f1
-                    else:
-                        wrong[1] += f1-self.slices[n+1].points.shape[0]-2
-                    if [wrong[0],wrong[1]] in bad_connect:
-                        dist_matrix[f0,f1] = np.inf
-                    else:
-                        bad_connect.append([wrong[0],wrong[1]])
-                else:
-                    dist_matrix[f0,f1] = np.inf
-
-                return mincost,the_path,wrong,total_cost,final_min_cord,dist_matrix
-
-            def orientation_match():
-
-                ## Could never figure out why putting everyone in the same orientation
-                ##doesn't fix orientation problems. So the solution is to try both
-                ##possible orientations and pick the best one
-                self.slices[n+1].c_clockwise(self.surface_orientation)
-                dist_matrix = self.__CostMatrix(self.slices[n],self.slices[n+1])
-                aux = stitch_logic(
-                        self.slices[n],
-                        self.slices[n+1],
-                        True,
-                        dist_matrix)
-                inter_memo1 = self._intersection_counter
-                self._intersection_counter = 0
-                self.slices[n+1].c_clockwise(-1*self.surface_orientation)
-
-                dist_matrix = self.__CostMatrix(self.slices[n],self.slices[n+1])
-                aux = stitch_logic(
-                        self.slices[n],
-                        self.slices[n+1],
-                        True,
-                        dist_matrix)
-                inter_memo2 = self._intersection_counter
-                if inter_memo2>inter_memo1:
-                    self.slices[n+1].c_clockwise(self.surface_orientation)
-                self._intersection_counter = 0
-                return
-
-            orientation_match()
+            self.slices[n+1].c_clockwise(self.surface_orientation)
             dist_matrix = self.__CostMatrix(self.slices[n],self.slices[n+1])
             self.border_intersection = False
             '''
-
                 After reordering the both sequences of points, we need
             to a way to conect all in between points that represent a
             surface that:
@@ -479,7 +394,6 @@ class Surface():
             bad_connect = []
             rerun = False
             limit = 100
-
             while not self.border_intersection:
                 if len(bad_connect) >= limit:
                     skip_intersection = True
@@ -487,12 +401,59 @@ class Surface():
                 else:
                     skip_intersection = False
 
-                mincost,the_path,wrong,total_cost,final_min_cord,dist_matrix = stitch_logic(
-                                                                                self.slices[n],
-                                                                                self.slices[n+1],
-                                                                                skip_intersection,
-                                                                                dist_matrix,
-                                                                                bad_connect)
+                ##After finding a path with o intersections
+                ## finding all min values contained inthe matrix
+                ##there's usually only one, but the value might
+                ##be repeated somewhere
+                closest_point_dist = np.amin(dist_matrix)
+                allMin = np.where(dist_matrix == closest_point_dist)
+                list_cordinates = list(zip(allMin[0], allMin[1]))
+                final_min_cord = list_cordinates[0]
+                f0 = final_min_cord[0]
+                f1 = final_min_cord[1]
+
+
+                ## Re-order the points: put the first connection at (0,0)
+                reordered_upper =  self.__Reordering(
+                    self.slices[n],
+                    final_min_cord[0])
+                reordered_lower =  self.__Reordering(
+                    self.slices[n+1],
+                    final_min_cord[1])
+                cost_matrix =  self.__CostMatrix(reordered_upper,reordered_lower)
+                for bad in bad_connect:
+                    if bad[0]>=f0:
+                        bad1 = bad[0]-f0
+                    else:
+                        bad1 = bad[0]+(self.slices[n].points.shape[0]-f0-1)
+                    if bad[1]>=f1:
+                        bad2 = bad[1]-f1
+                    else:
+                        bad2 = bad[1]+(self.slices[n+1].points.shape[0]-f1-1)
+                    cost_matrix[bad1,bad2] = np.inf
+                mincost,the_path,wrong,total_cost = self.__FindPath(
+                                                                cost_matrix,
+                                                                self.slices[n].points.shape[0],
+                                                                self.slices[n+1].points.shape[0],
+                                                                reordered_upper,
+                                                                reordered_lower,
+                                                                skip_intersection)
+                ##fixing relative order to absolute/initial order
+                if not isinstance(wrong, int):
+                    if wrong[0]+f0 <= self.slices[n].points.shape[0]-2:
+                        wrong[0] += f0
+                    else:
+                        wrong[0] += f0-self.slices[n].points.shape[0]-2
+                    if wrong[1]+f1 <= self.slices[n+1].points.shape[0]-2:
+                        wrong[1] += f1
+                    else:
+                        wrong[1] += f1-self.slices[n+1].points.shape[0]-2
+                    if [wrong[0],wrong[1]] in bad_connect:
+                        dist_matrix[f0,f1] = np.inf
+                    else:
+                        bad_connect.append([wrong[0],wrong[1]])
+                else:
+                    dist_matrix[f0,f1] = np.inf
 
             ## The path is calculated based on the reordered points,
             ##so we should invert the transformation so that we have
@@ -516,183 +477,126 @@ class Surface():
 
         self.surfaceV +=  self.__Vertices(self.slices[n+1].points)
         for i in close_list:
-            self.surfaceE += self.__CloseSurface(i, total_shift)
+            closing_points = self.slices[i].points
+            self.slices[i].area_vec()
+            area_vec = self.slices[i].area
+            if i == 0:
+                closing_shift = 0
+            else:
+                closing_shift = total_shift
+            self.surfaceE += self.__CloseSurface(closing_points, area_vec, closing_shift)
         self.out_surface = True
     def super_resolution(self):
         self.super_surface
 
     ## Not meant for end-user
-    def __CloseSurface(self, closing_index, shift=0):
-        if closing_index==0:
-            shift=0
+    def __CloseSurface(self, closing_points, area_vec, shift=0):
         '''
-            Slicing an ear using prune-and-search
-
-            Given a good sub-polygon GSP of a polygon P and
-            a vertex p_i of GSP this algorithm reports a proper ear.
-                1. if p_i, is an ear report it and exit.
-                2. Find a vertex pj such that (p_i, p_j) is a diagonal of
-                GSP. Let GSP' be the good sub-polygon of GSP
-                formed by (p_i, p_j). Re-label the vertices of GSP' so
-                that p_i=p_0 and p_j=p_k-1 (or p_j=p_0 and p_1=p_k-1,
-                as appropriate) where k is the number of vertices
-                of GSP'.
-                3. FindAnEar(GSP',floor(k/2)).
+            Explanation
         '''
-        def find_ear(Polygon, GSP, shift, area):
-            def diagonal_clip(Polygon, GSP, area):
-                def check_inside(Polygon, GSP, p_i, p_j, area) -> bool:
-                    '''
-                        We first check if the direction change in the diagonal
-                        is smaller then the one made by going from the current
-                        point to the next one. For example, consider the case:
-                            1) from p_k going to p_k+1 we make a turn of 60o
-                            2) from p_k to p_j (creating a diagonal) we make a
-                            turn of 45 degrees, then we are inside the polygon
-                        If we are inside the polygon, then we need to check if
-                        the diagonal intersects any order line segment in the
-                        perimeter. If that is not the case, then we may say that
-                        the diagonal is trully inside the polygon.
-                    '''
-                    displacement1 = GSP[p_i][0] - GSP[p_i-1][0]
-                    if p_i+1 == GSP.shape[0]:
-                        displacement2 = (GSP[0][0] - GSP[p_i][0])
-                    else:
-                        displacement2 = (GSP[p_i+1][0] - GSP[p_i][0])
-                    diagonal_segment = (GSP[p_j][0] - GSP[p_i][0])
-
-                    ## checking if they turn inside or not
-                    sign_angle_i = displacement1**displacement2
-                    if sign_angle_i.mod()>0:
-                        sign_angle_i = sign_angle_i*(1/sign_angle_i.mod())
-                    sign_angle_j = displacement1**diagonal_segment
-                    if sign_angle_j.mod()>0:
-                        sign_angle_j = sign_angle_j*(1/sign_angle_j.mod())
-                    if sign_angle_i.mod()==0 and sign_angle_j.mod()==0:
-                        return False
-                    if (sign_angle_i+area).mod()>area.mod():
-                        if sign_angle_j.mod()==0:
-                            return False
-                        inside1 = True
-                    else:
-                        inside1 = False
-                    if (sign_angle_j+area).mod()>area.mod():
-                        inside2 = True
-                    else:
-                        if sign_angle_i.mod()==0:
-                            return False
-                        inside2 = False
-
-
-                    if inside1 and not inside2:
-                        return False
-
-                    '''
-                     Remember that all the angles calculated range from
-                    0 to pi. So we need the inside1 and inside2 to teel
-                    whether or not its trully ranging from 0 to pi or if it
-                    should be from pi to 2pi
-                    '''
-                    angle_i = displacement2.dot(displacement1)
-                    angle_i = angle_i/(displacement2.mod()*displacement1.mod())
-                    if angle_i>1:
-                        print(angle_i)
-                        angle_i = 1
-                    if angle_i<-1:
-                        print(angle_i)
-                        angle_i = -1
-                    angle_i = np.pi - np.arccos(angle_i)
-
-                    angle_j = diagonal_segment.dot(displacement1)
-                    angle_j = angle_j/(diagonal_segment.mod()*displacement1.mod())
-                    if angle_j>1:
-                        print(angle_j)
-                        angle_j = 1
-                    if angle_j<-1:
-                        print(angle_j)
-                        angle_j = -1
-                    angle_j = np.pi - np.arccos(angle_j)
-                    if inside2 and inside1:
-                        if angle_j>=angle_i:
-                            return False
-                    if not inside2 and not inside1:
-                        if angle_i>=angle_j:
-                            return False
-
-                    for index in range(Polygon.shape[0]-1):
-                        if Perimeter().find_intersection(
-                            Polygon[index][0],
-                            Polygon[index+1][0],
-                            GSP[p_i][0],
-                            GSP[p_j][0],
-                            False):
-                            return False
-                    return True
-                half = int((GSP.shape[0]-1)/2)+1
-                for j in range(2,half):
-                    for i in range(GSP.shape[0]-j):
-                        p_i = i
-                        p_diag = p_i+j
-                        if p_diag == GSP.shape[0]:
-                            p_diag = 0
-                        if check_inside(Polygon, GSP, p_i, p_diag, area):
-                            if p_diag>p_i:
-                                gsp1 = GSP[p_i:p_diag+1]
-                                sub_deletion = [[k] for k in range(p_i+1,p_diag)]
-                                gsp2 = np.delete(GSP, sub_deletion, axis=0)
-                            else:
-                                gsp1 = GSP[p_diag:p_i+1]
-                                sub_deletion = [[k] for k in range(p_diag+1,p_i+1)]
-                                gsp2 = np.delete(GSP, sub_deletion, axis=0)
-                            return gsp1, gsp2
-                raise Exception("Failed to find diagonal in subpolygon\nCheck CloseSurface method")
-            def ear(GSP):
-                if GSP.shape[0] <= 4:
-                    return True
-                return False
-            if ear(GSP):
-                if GSP.shape[0] == 4:
-                    p0 = GSP[0][1]
-                    p1 = GSP[1][1]
-                    p2 = GSP[2][1]
-                    s = "f " +str(p0+shift) +\
-                            " " + str(p1+shift) +\
-                            " " + str (p2+shift) + "\n"
-                    p0 = GSP[2][1]
-                    p1 = GSP[3][1]
-                    p2 = GSP[0][1]
-                    s += "f " +str(p0+shift) +\
-                            " " + str(p1+shift) +\
-                            " " + str (p2+shift) + "\n"
-                if GSP.shape[0] == 3:
-                    p0 = GSP[0][1]
-                    p1 = GSP[1][1]
-                    p2 = GSP[2][1]
-                    s = "f " +str(p0+shift) +\
-                            " " + str(p1+shift) +\
-                            " " + str (p2+shift) + "\n"
-
-                if GSP.shape[0] < 3:
-                    raise Exception("GSP subdivision failed")
-                return s
-            else:
-                edges = ''
-                gsp1, gsp2 = diagonal_clip(Polygon, GSP, area)
-                e1 = find_ear(Polygon, gsp1, shift, area)
-                e2 = find_ear(Polygon, gsp2, shift, area)
-                edges += e1 + e2
-            return edges
-        number_points = self.slices[closing_index].points.shape[0]-1
-        self.slices[closing_index].area_vec()
-        area_vec = self.slices[closing_index].area
+        number_points = closing_points.shape[0]-1
         points = np.array([[Point(0,0,0),0]]*number_points)
+        edges = ''
 
         for i in range(number_points):
-            points[i][0] = self.slices[closing_index].points[i]
-            points[i][1] = i+1 ##+1 to correct the .obj file format counting
-        edges = find_ear(points, points, shift, area_vec)
+            points[i][0] = closing_points[i]
+            points[i][1] = i+1+shift #+1 corrects the .obj file format counting
+
+        def is_ear(GSP, p_i,area_vec):
+            def point_tiangle_3D(p1, p2, p3, p):
+                ##returns if a point is inside the triangle surface or not
+                v0 = p3 - p1
+                v1 = p2 - p1
+                v2 = p - p1
+                dot00 = v0.dot(v0)
+                dot01 = v0.dot(v1)
+                dot02 = v0.dot(v2)
+                dot11 = v1.dot(v1)
+                dot12 = v1.dot(v2)
+                if (dot00 * dot11 - dot01 * dot01) == 0:
+                    return False
+                invDenom = 1 / (dot00 * dot11 - dot01 * dot01)
+                u = (dot11 * dot02 - dot01 * dot12) * invDenom
+                v = (dot00 * dot12 - dot01 * dot02) * invDenom
+                eta = 1e-5
+                return (u>=0-eta) and (v>=0-eta) and (u+v<1+eta)
+            if p_i == 0:
+                p1 = GSP.shape[0]-1
+            else:
+                p1 = p_i-1
+            if p_i == GSP.shape[0]-1:
+                p3 = 0
+            else:
+                p3 = p_i+1
+            displacement1 = GSP[p1][0] - GSP[p_i][0]
+            displacement2 = GSP[p3][0] - GSP[p_i][0]
+            displacement1 = displacement1*(1/displacement1.mod())
+            displacement2 = displacement2*(1/displacement2.mod())
+            the_dot = displacement1.dot(displacement2)
+            if the_dot>1:
+                the_dot = 1
+            if the_dot<-1:
+                the_dot = -1
+            angle1 = np.arccos(the_dot)
+
+            if ((-1*displacement1)**displacement2).dot(area_vec) < 0:
+                return False
+            if angle1==np.pi:
+                return False
+
+            for index in range(GSP.shape[0]):
+                if index==p_i or index==p1 or index==p3:
+                    continue
+                if point_tiangle_3D(GSP[p_i][0], GSP[p1][0], GSP[p3][0], GSP[index][0]):
+                    return False
+            for index in range(GSP.shape[0]-1):
+                if index==p_i or index==p1 or index==p3:
+                    continue
+                if index==p_i+1 or index==p1+1 or index==p3+1:
+                    continue
+                if Perimeter().find_intersection(
+                    GSP[index][0],
+                    GSP[index+1][0],
+                    GSP[p1][0],
+                    GSP[p3][0],
+                    False):
+                    return False
+            return True
+        def triang_ear(GSP, p_i):
+            if p_i == 0:
+                p0 = GSP[GSP.shape[0]-1][1]
+            else:
+                p0 = GSP[p_i-1][1]
+            p1 = GSP[p_i][1]
+            if p_i == GSP.shape[0]-1:
+                p2 = GSP[0][1]
+            else:
+                p2 = GSP[p_i+1][1]
+            s = "f " +str(p0) +\
+                    " " + str(p1) +\
+                    " " + str (p2) + "\n"
+            return s
+
+        loop_max = points.shape[0]-2
+        triang_count = 1
+        while triang_count!=loop_max:
+            for i in range(points.shape[0]):
+                if is_ear(points,i,area_vec):
+                    edges += triang_ear(points,i)
+                    points = np.delete(points,i,0)
+                    triang_count += 1
+                    break
+                if i == points.shape[0]-1:
+                    close_problem = True
+                    triang_count=loop_max
+                else:
+                    close_problem = False
+                if points.shape[0]==3:
+                    triang_count=loop_max
+        edges += triang_ear(points,1)
 
         return edges
+
     def __CostMatrix(self, reordered_upper, reordered_lower) -> np.ndarray:
         ## Upper stands for the surface on top and Lower for the one in the bottom
         M = reordered_upper.points.shape[0]
