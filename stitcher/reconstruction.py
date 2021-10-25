@@ -119,18 +119,9 @@ class Perimeter():
             v2 = self.points[n+1]-self.points[0]
             cross = v1**v2
             self.area += cross*(1/2)
-    def normal_vec(self):
-
-        for n in range(self.points.shape[0]-1):
-            self.normal.x += (self.points[n].y-self.points[n+1].y) * (self.points[n].z-self.points[n+1].z)
-            self.normal.y += (self.points[n].z-self.points[n+1].z) * (self.points[n].x-self.points[n+1].x)
-            self.normal.z += (self.points[n].x-self.points[n+1].x) * (self.points[n].y-self.points[n+1].y)
-        self.normal = (1/self.normal.mod())*self.normal
     def c_clockwise(self, global_orientation=Point(1,0,0)):
         ## Reorients surface to counter-clockwise
         ##and creates a area vector
-        if self.normal.mod()==0:
-            self.normal_vec()
         if self.area.mod()==0:
             self.area_vec()
         if self.area.dot(global_orientation)<0:
@@ -239,7 +230,7 @@ class Perimeter():
     def islands_ensemble(self, other):
         M = self.points.shape[0]-1
         N = other.points.shape[0]-1
-        other.c_clockwise(self.normal)
+        other.c_clockwise(self.area)
         small_dist = np.inf
         for i in range(M):
             p_i = self.points[i]

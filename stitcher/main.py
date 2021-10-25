@@ -30,9 +30,10 @@ def island_init(file_dir,f,subdivision=3):
     I = rct.Perimeter(arq)
     I.remove_overlap()
     I.remove_overlap()
-    I.normal_vec()
+    I.area_vec()
     I.fix_distance(subdivision=3)
     I.fix_intersection()
+    I.area_vec()
     return I
 
 for block in Data["Stitches3D"]:
@@ -56,6 +57,7 @@ for block in Data["Stitches3D"]:
                     I.fix_intersection()
                 else:
                     I = island_init(FileDir,file,3)
+                I.area_vec()
                 S.add_island(I)
             except Exception:
                 print("Failed to load "+file)
