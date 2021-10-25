@@ -32,6 +32,7 @@ def island_init(file_dir,f,subdivision=3):
     I.remove_overlap()
     I.normal_vec()
     I.fix_distance(subdivision=3)
+    I.fix_intersection()
     return I
 
 for block in Data["Stitches3D"]:
@@ -51,6 +52,7 @@ for block in Data["Stitches3D"]:
                             I = I_s
                         else:
                             I.islands_ensemble(I_s)
+                            I.fix_distance(subdivision=3)
                     I.fix_intersection()
                 else:
                     I = island_init(FileDir,file,3)
@@ -61,6 +63,6 @@ for block in Data["Stitches3D"]:
         print("\nBuilding surface: ",section)
         S.build_surface(close_list)
 
-        with open("Cerebelo_new_"+section+".obj", "w") as out_file:
+        with open("vent_"+section+".obj", "w") as out_file:
             out_file.write(S.surfaceV)
             out_file.write(S.surfaceE)
