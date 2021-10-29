@@ -38,12 +38,18 @@ class Point():
             return False
     def __str__(self):
         return "{x},{y},{z}".format(x = self.x, y = self.y, z = self.z)
+    def __eq__(self, other):
+        if isinstance(other, Point):
+            if self.x == other.x and self.y == other.y and self.z == other.z:
+                return True
+        return False
 
 class Perimeter():
 
     def __init__(self, *args):
         self.normal = Point(0,0,0)
         self.area = Point(0,0,0)
+        self.blend_points = np.array([])
         if args:
             if not isinstance(args[0][0], Point):
                 ## np array of classes seems to point (memory level) at
@@ -90,7 +96,7 @@ class Perimeter():
                 self.points = np.insert(self.points, i+counter+1, points_list)
                 counter += aux
                 aux = 0
-    def remove_overlap(self): ##fix conditions
+    def remove_overlap(self): #fix conditions
         def neighbourhood(p1,p2) -> bool:
             delta = 1e-10
             if (self.points[i] - self.points[j]).mod() <= delta:
@@ -127,6 +133,8 @@ class Perimeter():
         if self.area.dot(global_orientation)<0:
             self.points = np.flip(self.points,0)
             self.area = -1*self.area
+            for bridges in range(self.blend_points.shape[0]):
+                self.blend_points[bridges] = np.flip(self.blend_points[bridges], axis=0)
     def geometric_center(self) -> Point:
         x = 0
         y = 0
@@ -193,7 +201,6 @@ class Perimeter():
         check = True
         Loops = 0   ## flexibility condition to avoid infinity
                     ##loops that may occur inside the while
-
         while check:
             found = False
             for i in range(p_points-3):
@@ -227,7 +234,7 @@ class Perimeter():
                 check = False
             if Loops > 20:
                 check = False
-    def islands_ensemble(self, other):
+    def islands_ensemble(self, other): #needs commenting
         M = self.points.shape[0]-1
         N = other.points.shape[0]-1
         other.c_clockwise(self.area)
@@ -240,7 +247,7 @@ class Perimeter():
                     small_dist = (p_i-p_j).mod()
                     best_p_i = i
                     best_p_j = j
-        vari = M+N
+        vari = M+N+1
         merged = np.array([Point(0,0,0)]*(vari))
         delta = 0
         for i in range(M):
@@ -248,14 +255,27 @@ class Perimeter():
                 for j in range(N):
                     if best_p_j+j<N:
                         merged[i+j] = other.points[best_p_j+j]
+                        last_j = best_p_j+j
                     else:
                         merged[i+j] = other.points[j-(N-best_p_j)]
-                delta = N-1
+                        last_j = j-(N-best_p_j)
+                delta = N
+                merged[i+delta] = self.points[i]
             else:
                 merged[i+delta] = self.points[i]
         merged[vari-1] = self.points[0]
-        self.points = merged
 
+        if self.blend_points.shape[0]==0:
+            self.blend_points = np.array([[self.points[best_p_i],
+                                    other.points[best_p_j],
+                                    other.points[last_j],
+                                    self.points[best_p_i+1]]])
+        else:
+            self.blend_points = np.append(self.blend_points,np.array([[self.points[best_p_i],
+                                    other.points[best_p_j],
+                                    other.points[last_j],
+                                    self.points[best_p_i+1]]]), axis=0)
+        self.points = merged
     def __str__(self):
         return "{L}\nwith shape = {S}".format(
                     L = [self.points[i].__str__()\
@@ -336,7 +356,7 @@ class Surface():
         self.surface_orientation = Point(0,0,0)
         self._intersection_counter = 0
 
-    def create_island(self, npArray):
+    def create_island(self, npArray): #?????
         #I = [Perimeter().append(npArray[i]) for i in range(npArray.shape[0])]
     	self.slices = np.append(self.slices, np.array([I]), axis=0)
     def add_island(self, *arg):
@@ -352,7 +372,7 @@ class Surface():
                 np.array([Perimeter()]),
                 axis=0
                 )
-    def mesh_out(self):
+    def mesh_out(self): #implement and comment
         if self.out_surface:
             out = 0
         else:
@@ -477,11 +497,68 @@ class Surface():
                 closing_shift = total_shift
             self.surfaceE += self.__CloseSurface(closing_points, area_vec, closing_shift)
         self.out_surface = True
-    def super_resolution(self):
+    def super_resolution(self): #implement and comment
         self.super_surface
+    def closebif(self, file_index, bif_list):
+        '''
+            There are 2 pairs of lines per connection created by merging
+        islands. So we need to select those 2 pairs and put a surface on them
+        to close all sruface holes.
+            There are however some procidures such fix_intersection(), that
+        may cause each pair to flip oriention individually. Instead of
+        finding if they did or did not flip, we chose to simple allert when
+        passing by one of the points.
+            On the first pass, we record the next points because they are part
+        of the line segment. On the second alert, we stop the recording.
+        Finally, we grab 2 pairs at a time and triangulate them.
+            Note that having more than 2 pairs means that there 3 or more
+        islands on a given slice.
+        '''
+
+        bif = np.copy(self.slices[file_index].points)
+        blend_points = np.copy(self.slices[file_index].blend_points)
+        area = self.slices[file_index].area
+
+        shift = 0
+        for s in range(file_index):
+            shift += self.slices[s].points.shape[0]-1
+
+        for bridges in self.slices[file_index].blend_points:
+            bridge_mut = np.copy(bridges) #dont mess with the original: leanrt the hard way
+            part1 = np.array([bridge_mut[0],bridge_mut[1]])
+            part2 = np.array([bridge_mut[2],bridge_mut[3]])
+            bif_diff = np.array([Point(0,0,0)])
+            index_list = np.array([],dtype=int)
+            count1 = 0
+            count2 = 0
+            start_part1 = False
+            start_part2 = False
+
+            for point in range(bif.shape[0]): #reccording loop
+                if bif[point] in part1:
+                    start_part1 = True
+                    count1 += 1
+                if bif[point] in part2:
+                    start_part2 = True
+                    count2 += 1
+                if start_part1:
+                    bif_diff = np.append(bif_diff, bif[point])
+                    index_list = np.append(index_list, point+shift+1)
+                    if count1==2:
+                        start_part1 = False
+                if start_part2:
+                    bif_diff = np.append(bif_diff, bif[point])
+                    index_list = np.append(index_list, point+shift+1)
+                    if count2==2:
+                        start_part2 = False
+
+            index_list = np.append(index_list, index_list[0])
+            bif_diff = np.delete(bif_diff,0,0)
+            bif_diff = np.append(bif_diff, bif_diff[0])
+            self.surfaceE += self.__CloseSurface(bif_diff, area, shift, index_list)
 
     ## Not meant for end-user
-    def __CloseSurface(self, closing_points, area_vec, shift=0):
+    def __CloseSurface(self, closing_points, area_vec, shift=0, index_list = None):#needs comments
         '''
             Explanation
         '''
@@ -491,9 +568,13 @@ class Surface():
 
         for i in range(number_points):
             points[i][0] = closing_points[i]
-            points[i][1] = i+1+shift #+1 corrects the .obj file format counting
+            #print('"[{},{},{}]",'.format(closing_points[i].x,closing_points[i].y,closing_points[i].z))
+            if not isinstance(index_list, np.ndarray):
+                points[i][1] = i+1+shift #+1 corrects the .obj file format counting
+            else:
+                points[i][1] = index_list[i]
 
-        def is_ear(GSP, p_i,area_vec):
+        def is_ear(GSP, p_i,area_vec): #check for intersection, points inside triangulation...
             def point_tiangle_3D(p1, p2, p3, p):
                 ##returns if a point is inside the triangle surface or not
                 v0 = p3 - p1
@@ -553,7 +634,7 @@ class Surface():
                     False):
                     return False
             return True
-        def triang_ear(GSP, p_i):
+        def triang_ear(GSP, p_i): #string outrput
             if p_i == 0:
                 p0 = GSP[GSP.shape[0]-1][1]
             else:
@@ -587,7 +668,6 @@ class Surface():
         edges += triang_ear(points,1)
 
         return edges
-
     def __CostMatrix(self, reordered_upper, reordered_lower) -> np.ndarray:
         ## Upper stands for the surface on top and Lower for the one in the bottom
         M = reordered_upper.points.shape[0]
@@ -599,7 +679,7 @@ class Surface():
                 cost_matrix[m,n] = (reordered_upper.points[m] - reordered_lower.points[n]).mod()
 
         return cost_matrix
-    def __FindPath(self, final_matrix, M, N, reordered_upper, reordered_lower, skip_intersection = False):
+    def __FindPath(self, final_matrix, M, N, reordered_upper, reordered_lower, skip_intersection = False):#needs comments
         def surface_intersection(the_path, path_limit, next, upper, reordered_upper, reordered_lower, skip_intersection = False) -> bool:
             def line_triangle_intersection(q1, q2, p1, p2, p3):
                 ## stackoverflow.com/questions/42740765/intersection-between-line-and-triangle-in-3d
@@ -958,6 +1038,7 @@ if __name__=="__main__":
     S.add_island(I)
     S.add_island(I2)
     S.build_surface([0,1])
+    print(Point(0,0,0)==1,1==Point(0,0,0),Point(0,0,0)==Point(1,1,1),Point(0,0,0)==Point(0,0,0))
     with open("gold_test4.obj", "w") as out_file:
         out_file.write(S.surfaceV)
         out_file.write(S.surfaceE)

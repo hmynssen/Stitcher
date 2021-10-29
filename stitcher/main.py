@@ -65,6 +65,13 @@ for block in Data["Stitches3D"]:
         print("\nBuilding surface: ",section)
         S.build_surface(close_list)
 
-        with open("vent_"+section+".obj", "w") as out_file:
+        ## Closing the bridges created by merge island algorithm
+        try: #Data["CloseBifurcation"] doesnt allways have a section
+            file_index = Data["CloseBifurcation"][0][str(section)][0]
+            bif_list = block[section][file_index]
+            S.closebif(file_index, bif_list)
+        except:
+            0
+        with open("cerebelo_"+section+".obj", "w") as out_file:
             out_file.write(S.surfaceV)
             out_file.write(S.surfaceE)
