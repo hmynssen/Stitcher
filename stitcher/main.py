@@ -53,8 +53,8 @@ for block in Data["Stitches3D"]:
                             I = I_s
                         else:
                             I.islands_ensemble(I_s)
-                            I.fix_distance(subdivision=3)
-                    I.fix_intersection()
+                            I.fix_intersection()
+                            I.fix_distance(subdivision=1)
                 else:
                     I = island_init(FileDir,file,3)
                 I.area_vec()

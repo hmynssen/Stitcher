@@ -196,7 +196,6 @@ class Perimeter():
         .This fixes the list in the sense that it will be no longer a
         self-intersecting curve
         '''
-
         p_points = self.points.shape[0]
         check = True
         Loops = 0   ## flexibility condition to avoid infinity
@@ -218,6 +217,7 @@ class Perimeter():
                             self.points[i+1],
                             self.points[j],
                             self.points[j+1]):
+
                         found = True
                         aux = np.array([Point(0,0,0)])
                         for fix in self.points[(i+1):(j+1)]:
@@ -225,8 +225,42 @@ class Perimeter():
                         aux = np.delete(aux,0)
                         aux = np.flip(aux, axis=0)
                         if aux.size != 0:
+                            for blends in range(self.blend_points.shape[0]):
+                                sup = np.copy(self.blend_points[blends])
+                                count1 = 0
+                                count2 = 0
+                                count3 = 0
+                                count4 = 0
+                                compile = np.array([self.points[i],
+                                                    self.points[i+1],
+                                                    self.points[j],
+                                                    self.points[j+1]])
+                                if sup[0] in compile:
+                                    count1 += 1
+                                if sup[1] in compile:
+                                    count2 += 1
+                                if sup[2] in compile:
+                                    count3 += 1
+                                if sup[3] in compile:
+                                    count4 += 1
+                                if count1 or count2 or count3 or count4:
+                                    print("intersection")
+                                if count1 and not count2 and count3 and count4:
+                                    self.blend_points[blends][0] = self.points[i]
+                                    self.blend_points[blends][1] = self.points[j]
+                                    self.blend_points[blends][2] = sup[1]
+                                    self.blend_points[blends][3] = self.points[i+1]
+                                if count1 and count2 and not count3 and count4:
+                                    self.blend_points[blends][0] = self.points[i]
+                                    self.blend_points[blends][1] = self.points[j]
+                                    self.blend_points[blends][2] = sup[1]
+                                    self.blend_points[blends][3] = self.points[j+1]
+                                if count1 and count2 and count3 and count4:
+                                    self.blend_points[blends][1] = sup[2]
+                                    self.blend_points[blends][2] = sup[1]
                             for replace in range(i+1, j+1):
                                 self.points[replace] = aux[replace-i-1]
+
                         break
             ##Loop break if many intersections are encoutered
             Loops += 1
@@ -525,33 +559,54 @@ class Surface():
 
         for bridges in self.slices[file_index].blend_points:
             bridge_mut = np.copy(bridges) #dont mess with the original: leanrt the hard way
-            part1 = np.array([bridge_mut[0],bridge_mut[1]])
-            part2 = np.array([bridge_mut[2],bridge_mut[3]])
-            bif_diff = np.array([Point(0,0,0)])
-            index_list = np.array([],dtype=int)
-            count1 = 0
-            count2 = 0
-            start_part1 = False
-            start_part2 = False
 
-            for point in range(bif.shape[0]): #reccording loop
-                if bif[point] in part1:
-                    start_part1 = True
-                    count1 += 1
-                if bif[point] in part2:
-                    start_part2 = True
-                    count2 += 1
-                if start_part1:
-                    bif_diff = np.append(bif_diff, bif[point])
-                    index_list = np.append(index_list, point+shift+1)
-                    if count1==2:
-                        start_part1 = False
-                if start_part2:
-                    bif_diff = np.append(bif_diff, bif[point])
-                    index_list = np.append(index_list, point+shift+1)
-                    if count2==2:
-                        start_part2 = False
+            def side(bridge_mut, bif, case = [0,0]):
+                '''
+                    Nice exception has appeared more than once. iF the link
+                between two islands is point zero, we have to cosinder the cases
+                of the bridge being the points before and after.
+                    There's no good proof, but its quite intuitive that the
+                smallest sequence of points should be the actuall bridge.
+                '''
+                part1 = np.array([bridge_mut[0],bridge_mut[1]])
+                part2 = np.array([bridge_mut[2],bridge_mut[3]])
+                bif_diff = np.array([Point(0,0,0)])
+                index_list = np.array([],dtype=int)
+                count1 = 0
+                count2 = 0
+                start_part1 = False
+                start_part2 = False
+                for point in range(case[0],bif.shape[0]-case[1]): #reccording loop
+                    if bif[point] in part1:
+                        start_part1 = True
+                        count1 += 1
+                    if bif[point] in part2:
+                        start_part2 = True
+                        count2 += 1
+                    if start_part1:
+                        bif_diff = np.append(bif_diff, bif[point])
+                        if point+1==bif.shape[0]:
+                            index_list = np.append(index_list, shift+1)
+                        else:
+                            index_list = np.append(index_list, point+shift+1)
+                        if count1==2:
+                            start_part1 = False
+                    if start_part2:
+                        bif_diff = np.append(bif_diff, bif[point])
+                        if point+1==bif.shape[0]:
+                            index_list = np.append(index_list, shift+1)
+                        else:
+                            index_list = np.append(index_list, point+shift+1)
+                        if count2==2:
+                            start_part2 = False
+                return bif_diff, index_list
 
+            bif_diff1, index_list1 = side(bridge_mut, bif, case = [0,1])
+            bif_diff2, index_list2 = side(bridge_mut, bif, case = [1,0])
+            if index_list1.shape[0]<index_list2.shape[0]:
+                bif_diff, index_list = bif_diff1, index_list1
+            else:
+                bif_diff, index_list = bif_diff2, index_list2
             index_list = np.append(index_list, index_list[0])
             bif_diff = np.delete(bif_diff,0,0)
             bif_diff = np.append(bif_diff, bif_diff[0])
