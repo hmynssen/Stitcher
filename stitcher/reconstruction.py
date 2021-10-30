@@ -264,8 +264,8 @@ class Perimeter():
                                 if count1 and count2 and count3 and not count4:
                                     self.blend_points[blends][0] = self.points[i]
                                     self.blend_points[blends][1] = self.points[j]
-                                    self.blend_points[blends][2] = self.points[i+1]
-                                    self.blend_points[blends][3] = self.points[j+1]
+                                    self.blend_points[blends][2] = self.points[j+1]
+                                    self.blend_points[blends][3] = sup[3]
                                 if count1 and count2 and count3 and count4:
                                     self.blend_points[blends][1] = sup[2]
                                     self.blend_points[blends][2] = sup[1]
