@@ -54,7 +54,7 @@ for block in Data["Stitches3D"]:
                         else:
                             I.islands_ensemble(I_s)
                             I.fix_intersection()
-                            I.fix_distance(subdivision=1)
+                            I.fix_distance(subdivision=3)
                 else:
                     I = island_init(FileDir,file,3)
                 I.area_vec()
@@ -72,6 +72,6 @@ for block in Data["Stitches3D"]:
             S.closebif(file_index, bif_list)
         except:
             0
-        with open("cerebelo_"+section+".obj", "w") as out_file:
+        with open("Vent_"+section+".obj", "w") as out_file:
             out_file.write(S.surfaceV)
             out_file.write(S.surfaceE)

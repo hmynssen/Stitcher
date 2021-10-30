@@ -200,6 +200,7 @@ class Perimeter():
         check = True
         Loops = 0   ## flexibility condition to avoid infinity
                     ##loops that may occur inside the while
+
         while check:
             found = False
             for i in range(p_points-3):
@@ -217,7 +218,6 @@ class Perimeter():
                             self.points[i+1],
                             self.points[j],
                             self.points[j+1]):
-
                         found = True
                         aux = np.array([Point(0,0,0)])
                         for fix in self.points[(i+1):(j+1)]:
@@ -243,8 +243,14 @@ class Perimeter():
                                     count3 += 1
                                 if sup[3] in compile:
                                     count4 += 1
-                                if count1 or count2 or count3 or count4:
-                                    print("intersection")
+                                if count1 or count2 or count3 or count4: #remove later
+                                    if 0:
+                                        print(count1, count2, count3, count4)
+                                        for p in self.points:
+                                            print('"[{},{},{}]",'.format(p.x,p.y,p.z))
+                                        print("blend")
+                                        for p in self.blend_points[0]:
+                                            print('"[{},{},{}]",'.format(p.x,p.y,p.z))
                                 if count1 and not count2 and count3 and count4:
                                     self.blend_points[blends][0] = self.points[i]
                                     self.blend_points[blends][1] = self.points[j]
@@ -254,6 +260,11 @@ class Perimeter():
                                     self.blend_points[blends][0] = self.points[i]
                                     self.blend_points[blends][1] = self.points[j]
                                     self.blend_points[blends][2] = sup[1]
+                                    self.blend_points[blends][3] = self.points[j+1]
+                                if count1 and count2 and count3 and not count4:
+                                    self.blend_points[blends][0] = self.points[i]
+                                    self.blend_points[blends][1] = self.points[j]
+                                    self.blend_points[blends][2] = self.points[i+1]
                                     self.blend_points[blends][3] = self.points[j+1]
                                 if count1 and count2 and count3 and count4:
                                     self.blend_points[blends][1] = sup[2]
@@ -610,6 +621,7 @@ class Surface():
             index_list = np.append(index_list, index_list[0])
             bif_diff = np.delete(bif_diff,0,0)
             bif_diff = np.append(bif_diff, bif_diff[0])
+            #print(index_list-shift,self.slices[file_index].points.shape[0])
             self.surfaceE += self.__CloseSurface(bif_diff, area, shift, index_list)
 
     ## Not meant for end-user
