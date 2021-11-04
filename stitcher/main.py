@@ -31,7 +31,7 @@ def island_init(file_dir,f,subdivision=3):
     I.remove_overlap()
     I.remove_overlap()
     I.area_vec()
-    I.fix_distance(subdivision=3)
+    I.fix_distance(subdivision=1)
     I.fix_intersection()
     I.area_vec()
     return I
@@ -54,7 +54,7 @@ for block in Data["Stitches3D"]:
                         else:
                             I.islands_ensemble(I_s)
                             I.fix_intersection()
-                            I.fix_distance(subdivision=3)
+                            I.fix_distance(subdivision=1)
                 else:
                     I = island_init(FileDir,file,3)
                 I.area_vec()
@@ -67,9 +67,9 @@ for block in Data["Stitches3D"]:
 
         ## Closing the bridges created by merge island algorithm
         try: #Data["CloseBifurcation"] doesnt allways have a section
-            file_index = Data["CloseBifurcation"][0][str(section)][0]
-            bif_list = block[section][file_index]
-            S.closebif(file_index, bif_list)
+            for file_index in Data["CloseBifurcation"][0][str(section)]:
+                bif_list = block[section][file_index]
+                S.closebif(file_index, bif_list)
         except:
             0
         with open("Vent_"+section+".obj", "w") as out_file:
