@@ -20,6 +20,7 @@ FileDir = Data["FileDir"]
 OutputDir = Data["OutputDir"]
 DisplayConsoleStats = Data["DisplayConsoleStats"]
 MeshObjOutput = Data["MeshObjOutput"]
+name = "tronco"
 
 
 print("Loading files\n\n")
@@ -54,7 +55,7 @@ for block in Data["Stitches3D"]:
                         else:
                             I.islands_ensemble(I_s)
                             I.fix_intersection()
-                            I.fix_distance(subdivision=1)
+                            #I.fix_distance(subdivision=1)
                 else:
                     I = island_init(FileDir,file,3)
                 I.area_vec()
@@ -72,6 +73,21 @@ for block in Data["Stitches3D"]:
                 S.closebif(file_index, bif_list)
         except:
             0
-        with open("Vent_"+section+".obj", "w") as out_file:
+        ## Extra lids that might be needed
+        ## So rare that dont even need to be optmized
+        ## Leave as is
+        try:
+            S_extra = rct.Surface()
+            for file_colection in Data["CloseExtra"][0][str(section)]:
+                get = file_colection[0]
+                for file_index in file_colection[1]:
+                    contours = Data["Stitches3D"][0][str(section)][get][file_index]
+                    S_extra.close_extra(island_init(FileDir,contours,3))
+                    with open("Extra_"+name+"_"+section+"_"+str(file_index)+".obj", "w") as out_file:
+                        out_file.write(S_extra.surfaceV_extra)
+                        out_file.write(S_extra.surfaceE_extra)
+        except:
+            0
+        with open(name+"_"+section+".obj", "w") as out_file:
             out_file.write(S.surfaceV)
             out_file.write(S.surfaceE)

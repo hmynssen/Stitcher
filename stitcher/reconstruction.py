@@ -515,14 +515,14 @@ class Surface():
             ##so we should invert the transformation so that we have
             ##the path for the original set of points
 
-            the_path =  self.__FixPathOrder(
+            the_path = self.__FixPathOrder(
                 the_path,
                 final_min_cord,
                 self.slices[n].points.shape[0],
                 self.slices[n+1].points.shape[0])
 
-            self.surfaceV +=  self.__Vertices(self.slices[n].points)
-            self.surfaceE +=  self.__Edges(
+            self.surfaceV += self.__Vertices(self.slices[n].points)
+            self.surfaceE += self.__Edges(
                 the_path,
                 self.slices[n].points.shape[0]-1,
                 self.slices[n+1].points.shape[0]-1,
@@ -531,7 +531,7 @@ class Surface():
             total_shift += self.slices[n].points.shape[0] - 1
             self.border_intersection = False
 
-        self.surfaceV +=  self.__Vertices(self.slices[n+1].points)
+        self.surfaceV += self.__Vertices(self.slices[n+1].points)
         for i in close_list:
             closing_points = self.slices[i].points
             self.slices[i].area_vec()
@@ -623,6 +623,13 @@ class Surface():
             bif_diff = np.append(bif_diff, bif_diff[0])
             #print(index_list-shift,self.slices[file_index].points.shape[0])
             self.surfaceE += self.__CloseSurface(bif_diff, area, shift, index_list)
+    def close_extra(self, island):
+        ## Simply takes an island and triangulate it
+        closing_points = island.points
+        self.surfaceV_extra = self.__Vertices(closing_points)
+        island.area_vec()
+        area_vec = island.area
+        self.surfaceE_extra = self.__CloseSurface(closing_points, area_vec, 0)
 
     ## Not meant for end-user
     def __CloseSurface(self, closing_points, area_vec, shift=0, index_list = None):#needs comments
