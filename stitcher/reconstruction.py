@@ -1,5 +1,4 @@
 import numpy as np
-import time
 
 class Point():
 
@@ -97,26 +96,21 @@ class Perimeter():
                 counter += aux
                 aux = 0
     def remove_overlap(self): #fix conditions
-        def neighbourhood(p1,p2) -> bool:
-            delta = 1e-10
-            if (self.points[i] - self.points[j]).mod() <= delta:
+        def neighbourhood(p1, p2, mean) -> bool:
+            delta = 0.01
+            if (self.points[i] - self.points[j]).mod() <= delta*mean:
                 return True
             return False
         aux = self.points
         counter = 0
-        eta = 1e-5
+        mean = 0
+        for i in range(self.points.shape[0]-1):
+            mean += (self.points[i]-self.points[i+1]).mod()
+        mean = mean/(self.points.shape[0]-1)
         for i in range(self.points.shape[0]-1):
             for j in range(i+1,self.points.shape[0]-1):
-                if neighbourhood(self.points[i],self.points[j]):
-                    if j == i+1:
-                        #aux = np.delete(aux,j)
-                        print("consecutive")
-                    if j == i+2:
-                        print("angle")
-                    if j > i+2:
-                        print("move it")
-                    aux = np.delete(aux,j)
-                    #self.points[j] += eta*(self.points[j]-self.points[j-1])
+                if neighbourhood(self.points[i],self.points[j],mean):
+                    aux = np.delete(aux,i)
         self.points = aux
     def area_vec(self):
         self.area = Point(0,0,0)
