@@ -95,9 +95,8 @@ class Perimeter():
                 self.points = np.insert(self.points, i+counter+1, points_list)
                 counter += aux
                 aux = 0
-    def remove_overlap(self): #fix conditions
-        def neighbourhood(p1, p2, mean) -> bool:
-            delta = 0.01
+    def remove_overlap(self,delta=0.01): #fix conditions
+        def neighbourhood(p1, p2, mean, delta) -> bool:
             if (self.points[i] - self.points[j]).mod() <= delta*mean:
                 return True
             return False
@@ -109,7 +108,7 @@ class Perimeter():
         mean = mean/(self.points.shape[0]-1)
         for i in range(self.points.shape[0]-1):
             for j in range(i+1,self.points.shape[0]-1):
-                if neighbourhood(self.points[i],self.points[j],mean):
+                if neighbourhood(self.points[i],self.points[j],mean, delta):
                     aux = np.delete(aux,i)
         self.points = aux
     def area_vec(self):
@@ -289,21 +288,34 @@ class Perimeter():
         vari = M+N+1
         merged = np.array([Point(0,0,0)]*(vari))
         delta = 0
-        for i in range(M):
-            if i==best_p_i+1:
-                for j in range(N):
-                    if best_p_j+j<N:
-                        merged[i+j] = other.points[best_p_j+j]
-                        last_j = best_p_j+j
-                    else:
-                        merged[i+j] = other.points[j-(N-best_p_j)]
-                        last_j = j-(N-best_p_j)
-                delta = N
-                merged[i+delta] = self.points[i]
-            else:
-                merged[i+delta] = self.points[i]
-        merged[vari-1] = self.points[0]
+        if best_p_i<M-1:
+            for i in range(M):
+                if i==best_p_i+1:
+                    for j in range(N):
+                        if best_p_j+j<N:
+                            merged[i+j] = other.points[best_p_j+j]
+                            last_j = best_p_j+j
+                        else:
+                            merged[i+j] = other.points[j-(N-best_p_j)]
+                            last_j = j-(N-best_p_j)
+                    delta = N
+                    merged[i+delta] = self.points[i]
+                else:
+                    merged[i+delta] = self.points[i]
 
+        else:
+            for i in range(M+1):
+                if i<M-1:
+                    merged[i] = self.points[i]
+                else:
+                    for j in range(N):
+                        if best_p_j+j<N:
+                            merged[i+j] = other.points[best_p_j+j]
+                            last_j = best_p_j+j
+                        else:
+                            merged[i+j] = other.points[j-(N-best_p_j)]
+                            last_j = j-(N-best_p_j)
+        merged[vari-1] = self.points[0]
         if self.blend_points.shape[0]==0:
             self.blend_points = np.array([[self.points[best_p_i],
                                     other.points[best_p_j],
