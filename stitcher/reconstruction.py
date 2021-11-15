@@ -109,7 +109,8 @@ class Perimeter():
         for i in range(self.points.shape[0]-1):
             for j in range(i+1,self.points.shape[0]-1):
                 if neighbourhood(self.points[i],self.points[j],mean, delta):
-                    aux = np.delete(aux,i)
+                    aux = np.delete(aux,i-counter)
+                    counter += 1
         self.points = aux
     def area_vec(self):
         self.area = Point(0,0,0)
