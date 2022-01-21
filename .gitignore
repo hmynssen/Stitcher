@@ -136,3 +136,4 @@ mesh/
 results/
 
 data/
+/stitcher/main.py
