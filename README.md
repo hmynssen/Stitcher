@@ -50,5 +50,5 @@ Reconstruction of 3D Surfaces
   close the 3d surface will be on files f1 and f5.
 
 # The Output
-
-  The program outputs the number of inputed files minus 1. Each output file containing Vertices and Edges organized in a format that is readable, for example, in [Meshlab](https://metabio.netlify.app).
+  ![Brain Example](img/example_result_alpha00.png)
+  To get the output, simply call Surface().Vertices() and Surface().Edges(). The output can be saved to an obj file and visualized at any obj viewer, such as [Meshlab](https://metabio.netlify.app).
