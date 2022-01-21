@@ -7,7 +7,7 @@ Reconstruction of 3D Surfaces
   A few tools have also been used to improve the final surface such as:
 
       . Artificially improving the resolution by interpolating the coefficients of the Fourier's Series of each contour;
-      . Auto-selection of files(Not fully implemented);
+      . Auto-selection of files;
       . Etc
 
   More text
@@ -16,9 +16,6 @@ Reconstruction of 3D Surfaces
 # Libraries Used
 
     . Numpy
-    . Matplotlib
-    . Scipy
-    . Scikit-Image
 
 # The Input
 
@@ -29,14 +26,20 @@ Reconstruction of 3D Surfaces
 
               {"Stitches3D": [
               {"1":["f1.json","f2.json"],
-                "2":[["f3.json","f4i2.json"],"f5.json"]}
+                "2":[["f3.json","f4.json"],"f5.json"]}
               ],
               "CloseSurface": [
-              {"1":[0],
-                "2":[1]}
+              {"1":[0]}
               ],
+              "CloseBifurcation": [{
+                "2":[0]
+                }],
+              "CloseExtra": [{
+                "2":[[0,[1]]]
+                }],
               "FileDir": "/path/to/conturs/json",
               "OutputDir": "/path/to/out/put/mesh",
+              "Name": "BrainReconstruction",
               "MeshObjOutput": BOOLEAN}
 
   The "Stitches3D" key indicates which contours should be connect, and list means merging the contours only
@@ -48,4 +51,4 @@ Reconstruction of 3D Surfaces
 
 # The Output
 
-  The program outputs the number of inputed files minus 1. Each output file containing Vertices and Edges organized in a format that is readable, for example, in [Meshlab](http://www.meshlab.net).
+  The program outputs the number of inputed files minus 1. Each output file containing Vertices and Edges organized in a format that is readable, for example, in [Meshlab](https://metabio.netlify.app).
