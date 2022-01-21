@@ -3,6 +3,7 @@ import numpy as np
 import os
 import reconstruction as rct
 from file_reader import roiread
+import time
 
 '''
     A colections of points Point() are correlated in a manner that creates
@@ -18,18 +19,20 @@ with open('main.json', 'r') as settings:
 Data = json.loads(data)
 FileDir = Data["FileDir"]
 OutputDir = Data["OutputDir"]
-DisplayConsoleStats = Data["DisplayConsoleStats"]
-MeshObjOutput = Data["MeshObjOutput"]
-name = "tronco"
-
-
+try:
+    name = Data["Name"]
+except:
+    name = "NONAME_r3000_l10_noRetro_eta-9"
+try:
+    os.makedirs(OutputDir)
+except:
+    0
 print("Loading files\n\n")
 print(FileDir)
 
 def island_init(file_dir,f,subdivision=3):
     arq = roiread(file_dir+"/"+f)
     I = rct.Perimeter(arq)
-    I.remove_overlap()
     I.remove_overlap()
     I.area_vec()
     I.fix_distance(subdivision=1)
@@ -83,11 +86,12 @@ for block in Data["Stitches3D"]:
                 for file_index in file_colection[1]:
                     contours = Data["Stitches3D"][0][str(section)][get][file_index]
                     S_extra.close_extra(island_init(FileDir,contours,3))
-                    with open("Extra_"+name+"_"+section+"_"+str(file_index)+".obj", "w") as out_file:
+                    with open(OutputDir+"/Extra_"+name+"_"+section+"_"+str(file_index)+".obj", "w") as out_file:
                         out_file.write(S_extra.surfaceV_extra)
                         out_file.write(S_extra.surfaceE_extra)
         except:
             0
-        with open(name+"_"+section+".obj", "w") as out_file:
+        with open(OutputDir+"/"+name+"_"+section+".obj", "w") as out_file:
             out_file.write(S.surfaceV)
             out_file.write(S.surfaceE)
+time.process_time()
