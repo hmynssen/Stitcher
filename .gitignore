@@ -137,3 +137,4 @@ results/
 
 data/
 /stitcher/main.py
+/stitcher/file_reader.py
