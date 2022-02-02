@@ -410,7 +410,7 @@ class Surface():
         self._intersection_counter = 0
 
     def set_parameters(self, **kwargs):
-        eror = 0
+        error = 0
         for k in kwargs:
             val = kwargs.get(k)
             if k=="intersection_range":
