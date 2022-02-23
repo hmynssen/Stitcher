@@ -3,7 +3,10 @@ Reconstruction of 3D Surfaces
 
 # Introduction
 
-  Based on ___ ,  we developed a code that could reconstruct a 3D surface given 2D planar contours to start from. The idea is to connect M points in a plane to N points on another plane in the most parsimonious way possible, which is accomplish-able by minimizing the total length of the connection lines. On the process of doing so, the program can also connect contours that belong to a same plane by making connecting their nearest points.
+  Based on [Fuchs, Henry, Zvi M. Kedem, and Samuel P. Uselton. "Optimal surface reconstruction from planar contours." Communications of the ACM 20.10 (1977): 693-702.](https://dl.acm.org/doi/abs/10.1145/359842.359846?casa_token=QG0Dw4j_pZMAAAAA:5hFtaJwiRkrrcLh3Pz_5Po1DdeNN30CWM9BPfFtFr7dXSv86-_VAvzRlOoOsdf7Z_-a0CwTKLi7ipQ),  I developed a code that could reconstruct a 3D surface given 2D planar contours to start from. The idea is to connect M points in a plane to N points on another plane in the most parsimonious way possible, which is accomplish-able by minimizing the total length of the connection lines. On the process of doing so, the script can also connect contours that belong to a same plane by making connecting their nearest points.
+
+  A possible desired output is a self-avoiding surface, instead of one that JUST minimizes total length. Such surface is currently searched and created by default but can be ignored by setting Surface()._intersection_range = 0.
+
   One tool that will be used to improve the final surface is:
 
       . Artificially improving the resolution by interpolating the coefficients of the Fourier's Series of each contour
@@ -11,14 +14,17 @@ Reconstruction of 3D Surfaces
   The goal of this code is to be able to create 3D models of brains for futher analysis in our lab, [metaBIO](https://metabio.netlify.app).
 
 # Libraries Used
+  For this library there's only one dependency:
 
     . Numpy
 
+  But for futher manipulation, one may use other python libraries to handle the .obj output. Another solution for futher manipulation is to use mesh editors: [Meshlab](https://www.meshlab.net) and [Blender](https://www.blender.org) are free to use and have a large community for support.
+  
 # The Input
 
   Create either a sequence of Points() or a numpy array as numpy.array([x,y,z]*N) and pass it to the Perimeter() class: Perimeter(list_of_points).
   From there, one could use a series of correction algorithms from the Perimeter class to match necessary reconstruction conditions.
-  
+
       .remove_overlap()
       .area_vec()
       .fix_distance()
