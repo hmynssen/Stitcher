@@ -95,7 +95,11 @@ class Perimeter():
                 self.points = np.insert(self.points, i+counter+1, points_list)
                 counter += aux
                 aux = 0
-    def remove_overlap(self,delta=0.01): #fix conditions
+    def remove_overlap(self,delta=0.01):
+        """
+            Remove points that are closer than delta times the mean distance from
+        each other.
+        """
         def neighbourhood(p1, p2, mean, delta) -> bool:
             if (self.points[i] - self.points[j]).mod() <= delta*mean:
                 return True
@@ -169,6 +173,7 @@ class Perimeter():
             ## Could not find the reference for why the bellow code should be used
             ## AS far as i'm concerned, two parallel lines should never intersect
             ##so the return should always be false
+            """
             d1 = p1 - p3
             d2 = p2 - p3
             d3 = p1 - p4
@@ -178,7 +183,7 @@ class Perimeter():
             if cond1 or cond2:
                 return True
             else:
-                return False
+                return False"""
         s = (dc**db).dot(da**db) / norm2
         t = (dc**da).dot(da**db) / norm2
         if border:
@@ -283,7 +288,16 @@ class Perimeter():
                 check = False
             if Loops > 20:
                 check = False
-    def islands_ensemble(self, other): #needs commenting
+    def islands_ensemble(self, other):
+        """
+            For 2 independent contours in the same plane, it is possible to glue them
+        together by picking the 2 closest points and creating a line that connects both.
+
+            The ideia is simple, but there's some complications with the ordering of points.
+        Also, it is possible that the two contours aren't fully separated, meaning that they
+        might intersect. For that reason it is advisable to use Perimeter.fix_intersection()
+        after ensembling two Perimeters().
+        """
         M = self.points.shape[0]-1
         N = other.points.shape[0]-1
         other.c_clockwise(self.area)
@@ -471,7 +485,7 @@ class Surface():
                 np.array([Perimeter()]),
                 axis=0
                 )
-    def mesh_out(self): #implement and comment
+    def mesh_out(self,path="",name="NoName"): #implement and comment
         if self.out_surface:
             out = 0
         else:
@@ -840,9 +854,18 @@ class Surface():
         self.surfaceE_extra = self.__CloseSurface(closing_points, area_vec, 0)
 
     ## Not meant for end-user
-    def __CloseSurface(self, closing_points, area_vec, shift=0, index_list = None):#needs comments
+    def __CloseSurface(self, closing_points, area_vec, shift=0, index_list = None):
         '''
-            Explanation
+            Implementation of a ear cliping algorithm to create a plane triangulation.
+
+            Currently using a simpler and more comprehensible algorithm from
+
+                ElGindy, Hossam, Hazel Everett, and Godfried Toussaint.
+                "Slicing an ear using prune-and-search."
+                Pattern Recognition Letters 14.9 (1993): 719-722.
+
+            The idea is to define what is mathematically an ear (a type of triangle), and
+        start cliping/slicing ear until there no more to be cliped.
         '''
         number_points = closing_points.shape[0]-1
         points = np.array([[Point(0,0,0),0]]*number_points)
@@ -850,7 +873,6 @@ class Surface():
 
         for i in range(number_points):
             points[i][0] = closing_points[i]
-            #print('"[{},{},{}]",'.format(closing_points[i].x,closing_points[i].y,closing_points[i].z))
             if not isinstance(index_list, np.ndarray):
                 points[i][1] = i+1+shift #+1 corrects the .obj file format counting
             else:
@@ -948,7 +970,6 @@ class Surface():
                 if points.shape[0]==3:
                     triang_count=loop_max
         edges += triang_ear(points,1)
-
         return edges
     def __CostMatrix(self, reordered_upper, reordered_lower) -> np.ndarray:
         ## Upper stands for the surface on top and Lower for the one in the bottom
@@ -961,7 +982,7 @@ class Surface():
                 cost_matrix[m,n] = (reordered_upper.points[m] - reordered_lower.points[n]).mod()
 
         return cost_matrix
-    def __FindPath(self, final_matrix, M, N, reordered_upper, reordered_lower, skip_intersection = False):#needs comments
+    def __FindPath(self, final_matrix, M, N, reordered_upper, reordered_lower, skip_intersection = False):
         def surface_intersection(the_path, path_limit, next, upper, reordered_upper, reordered_lower, skip_intersection = False, final_cond=[False,[0,0]]) -> bool:
             '''
                 Given a triangle with vertices p1, p2 and p3, we wish to know if a line segment
@@ -1030,7 +1051,6 @@ class Surface():
             m_local,n_local=the_path[index_local]
             min_cost_local[m_local][n_local]=np.inf
             the_path[index_local]=[0,0]
-            #print(the_path[index_local-3:index_local+3],index_local,the_path[index_local],m_local,n_local)
             index_local -= 1
             return m_local,n_local,min_cost_local,index_local,counter_local+1
 
@@ -1089,6 +1109,19 @@ class Surface():
                 return 0,0,[[0,0]],total_cost
             if m>0 and n>0:
                 if min_cost[m-1][n] < min_cost[m][n-1]:
+                    """
+                        Checks for the following
+
+                            x x x x x x x x
+                            x x x A x x x x
+                            x x B 0 0 0 0 x
+                            x x x x x x 0 x
+                            x x x x x x 0 0
+
+                        A is the new point to be inserted in the path (represented by zeros)
+                        if check[1] means it does cause an intersection. Then we try B, if it
+                        returns True, start over. If not, pick B instead of A.
+                    """
                     check = surface_intersection(the_path,
                                 index,
                                 [m-1,n],
@@ -1155,7 +1188,7 @@ class Surface():
                                     reordered_upper,
                                     reordered_lower,
                                     skip_intersection)
-                        if check2[1]:# or min_cost[m][n-1]==np.inf:
+                        if check2[1]:
                             if fix_counter<self.fix_limit:
                                 m,n,min_cost,index,fix_counter = retract(m,n,min_cost,index,the_path,fix_counter)
                                 m,n = the_path[index]
@@ -1198,7 +1231,7 @@ class Surface():
                                 reordered_upper,
                                 reordered_lower,
                                 skip_intersection)
-                    if check[1]:# or min_cost[m][n-1]==np.inf:
+                    if check[1]:
                         if fix_counter<self.fix_limit:
                             m,n,min_cost,index,fix_counter = retract(m,n,min_cost,index,the_path,fix_counter)
                             m,n = the_path[index]
@@ -1214,7 +1247,7 @@ class Surface():
                                 reordered_upper,
                                 reordered_lower,
                                 skip_intersection)
-                    if check[1]:# or min_cost[m-1][n]==np.inf:
+                    if check[1]:
                         if fix_counter<self.fix_limit:
                             m,n,min_cost,index,fix_counter = retract(m,n,min_cost,index,the_path,fix_counter)
                             m,n = the_path[index]
