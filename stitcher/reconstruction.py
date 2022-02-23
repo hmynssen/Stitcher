@@ -103,11 +103,15 @@ class Perimeter():
         aux = self.points
         counter = 0
         mean = 0
-        for i in range(self.points.shape[0]-1):
+        if self.points[0]==self.points[-1]:
+            correction = 1
+        else:
+            correction = 0
+        for i in range(self.points.shape[0]-1-correction):
             mean += (self.points[i]-self.points[i+1]).mod()
-        mean = mean/(self.points.shape[0]-1)
-        for i in range(self.points.shape[0]-1):
-            for j in range(i+1,self.points.shape[0]-1):
+        mean = mean/(self.points.shape[0]-1-correction)
+        for i in range(self.points.shape[0]-correction):
+            for j in range(i+1,self.points.shape[0]-correction):
                 if neighbourhood(self.points[i],self.points[j],mean, delta):
                     aux = np.delete(aux,i-counter)
                     counter += 1
@@ -134,11 +138,12 @@ class Perimeter():
         y = 0
         z = 0
         N = self.points.shape[0]
+        center = Point(0,0,0)
+        if self.points[0]==self.points[-1]:
+            N -= 1
         for i in range(N):
-            x += self.points[i].x
-            y += self.points[i].y
-            z += self.points[i].z
-        return Point(x/N,y/N,z/N)
+            center += self.points[i]
+        return center*(1/(N))
     def find_intersection(self, p1, p2, p3, p4, border = True) -> bool:
         ## Lets find a new algorithm to find intersections
         ##between lines
@@ -266,6 +271,7 @@ class Perimeter():
                             for replace in range(i+1, j+1):
                                 self.points[replace] = aux[replace-i-1]
 
+
                         break
             ##Loop break if many intersections are encoutered
             Loops += 1
@@ -328,6 +334,28 @@ class Perimeter():
                                     other.points[last_j],
                                     self.points[best_p_i+1]]]), axis=0)
         self.points = merged
+    def flush_to_numpy(self):
+        '''
+            Returns a numpy array of type:
+
+                array = [[x1,y1,z1],
+                        ....
+                        [xn,yn,zn]]
+
+            that correponds to the Point()s in self.points:
+        '''
+        flushed = np.zeros((self.points.shape[0],3))
+        for index,p in enumerate(self.points):
+            flushed[index] = [p.x,p.y,p.z]
+        return flushed
+    def numpy_to_point(self, flushed):
+        '''
+            Analogous to flush_to_numpy(), but returns an array of Point()s
+        '''
+        perimeter = np.zeros((flushed.shape[0],3))
+        for index,p in enumerate(flushed):
+            perimeter[index] = Point(flushed[index,0],flushed[index,1],flushed[index,2])
+        return perimeter
     def __str__(self):
         return "{L}\nwith shape = {S}".format(
                     L = [self.points[i].__str__()\
@@ -404,10 +432,11 @@ class Surface():
         self.slices = np.empty(0) ##collection of Perimeters
         self._surface = False ##Fully built surface
         self._intersection_range = 3000
-        self.fix_limit = 3
+        self.fix_limit = 0
         self.border_intersection = False ##
         self.surface_orientation = Point(0,0,0)
         self._intersection_counter = 0
+        self._intrinsic_interpolation = True
 
     def set_parameters(self, **kwargs):
         error = 0
@@ -564,8 +593,161 @@ class Surface():
                 closing_shift = total_shift
             self.surfaceE += self.__CloseSurface(closing_points, area_vec, closing_shift)
         self.out_surface = True
-    def super_resolution(self): #implement and comment
-        self.super_surface
+    def super_resolution(self, parcelation=1,seed=1):
+        import copy
+        if parcelation==0:
+            return
+        def rotate_to(perimeter_rotate, vector):
+            '''
+                Rotates a closed loop/surface until its area vector
+                is aligned with the in the vector
+            '''
+            unity_vec = vector*(1/vector.mod())
+            perimeter_rotate.area_vec()
+            unity_area = copy.deepcopy(perimeter_rotate.area)*(1/perimeter_rotate.area.mod())
+            theta = np.arccos(unity_vec.dot(unity_area))
+            unity_vec = unity_area**unity_vec
+            unity_vec = unity_vec *(1/unity_vec .mod())
+            new_point = []
+            for point in perimeter_rotate.points:
+                xcomp = (np.cos(theta)+unity_vec.x**2*(1-np.cos(theta)))*point.x +\
+                        (unity_vec.x*unity_vec.y*(1-np.cos(theta))-unity_vec.z*np.sin(theta))*point.y+\
+                        (unity_vec.x*unity_vec.z*(1-np.cos(theta))+unity_vec.y*np.sin(theta))*point.z
+
+                ycomp = (unity_vec.y*unity_vec.x*(1-np.cos(theta))+unity_vec.z*np.sin(theta))*point.x +\
+                        (np.cos(theta)+unity_vec.y**2*(1-np.cos(theta)))*point.y+\
+                        (unity_vec.y*unity_vec.z*(1-np.cos(theta))-unity_vec.x*np.sin(theta))*point.z
+
+                zcomp = (unity_vec.x*unity_vec.z*(1-np.cos(theta))-unity_vec.y*np.sin(theta))*point.x +\
+                        (unity_vec.z*unity_vec.z*(1-np.cos(theta))+unity_vec.x*np.sin(theta))*point.y+\
+                        (np.cos(theta)+unity_vec.z**2*(1-np.cos(theta)))*point.z
+                new_point.append(Point(xcomp,ycomp,zcomp))
+            return Perimeter(np.array(new_point))
+
+        def intrinsic_reference(perimeter):
+            '''
+                Returns intrinsic distance vectors of a perimeter
+            '''
+            intrinsic = np.array([Point(0,0,0)]*(perimeter.points.shape[0]-1))
+            for index in range(perimeter.points.shape[0]-1):
+                intrinsic[index] = perimeter.points[index+1]-perimeter.points[index]
+            return Perimeter(intrinsic)
+
+        def extrinsic_reference(perimeter):
+            '''
+                Returns extrinsic distance vectors of a perimeter with intrisic
+                reference. Also centers the geometric center to the origin
+            '''
+            intrinsic = np.array([Point(0,0,0)]*(perimeter.points.shape[0]+1))
+            for index in range(perimeter.points.shape[0]):
+                intrinsic[index+1] = perimeter.points[index]+intrinsic[index]
+            extrinsic = Perimeter(intrinsic)
+            geo = extrinsic.geometric_center()
+            for index in range(extrinsic.points.shape[0]):
+                extrinsic.points[index] -= geo
+            return extrinsic
+
+        def interpolate(perimeters,parcelation):
+            ##Returns list of all new permiters in order of height
+            def linear_interpol(interpol_1, interpol_2, parcelation):
+                """
+                    get the fourier coef and interpoalte
+                """
+                interpolation_sequence = []
+                for p in range(1,parcelation+1):
+                    newarray = interpol_2*p/(parcelation+1)+interpol_1*(1-p/(parcelation+1))
+                    interpolation_sequence.append(newarray)
+                return interpolation_sequence
+
+            array1 = perimeters[0].flush_to_numpy()
+            array1 = array1[:,:2]
+            array2 = perimeters[1].flush_to_numpy()
+            array2 = array2[:,:2]
+            if array1.shape[0]<array2.shape[0]:
+                diff = array2.shape[0]-array1.shape[0]
+                for i in range(diff):
+                    insrert_list = np.random.randint(0,array1.shape[0]-1,1)
+                    newpoint = (array1[insrert_list]+array1[insrert_list+1])/2
+                    array1 = np.insert(array1,insrert_list+1,newpoint,axis=0)
+            elif array1.shape[0]>array2.shape[0]:
+                diff = array1.shape[0]-array2.shape[0]
+                insrert_list = np.random.randint(0,array2.shape[0]-1,size=diff)
+                for i in insrert_list:
+                    newpoint = (array2[i]+array2[i+1])/2
+                    array2 = np.insert(array2,i+1,newpoint,axis=0)
+
+            transform1 = np.fft.fft2(array1)
+            transform2 = np.fft.fft2(array2)
+            interpolation_sequence = linear_interpol(transform1,transform2,parcelation)
+            resolved = []
+            for inter in interpolation_sequence:
+                points = np.fft.ifft2(inter).real
+                points[-1] = points[0]
+                points = [Point(px,py,0) for px,py in points]
+                perimeter = Perimeter(np.array(points))
+                if self._intrinsic_interpolation:
+                    perimeter = extrinsic_reference(perimeter)
+                resolved.append(perimeter)
+            return resolved
+
+        def perimeter_insert(perimeters):
+            def get_height(index):
+
+                height = self.slices[index+1].geometric_center()-self.slices[index].geometric_center()
+                self.slices[index].area_vec()
+                unity_area = copy.deepcopy(self.slices[index].area)*(1/self.slices[index].area.mod())
+                height = np.sqrt(height.dot(unity_area))
+                height = height*unity_area
+                return height
+            super_res = Surface()
+            fourier_original_coef = []
+            for index,perimeter_insertion in perimeters:
+                super_res.add_island(self.slices[index])
+                newperimeter = copy.deepcopy(perimeter_insertion)
+                height = get_height(index)
+                total = len(newperimeter)
+                local_geo = self.slices[index].geometric_center()
+                for fourier_index, p_insertion in enumerate(newperimeter):
+                    p_insertion = rotate_to(p_insertion,self.slices[index].area)
+                    for index2 in range(p_insertion.points.shape[0]):
+                        p_insertion.points[index2] += local_geo
+                        p_insertion.points[index2] += height*((fourier_index+1)/(total+1))
+                    p_insertion.remove_overlap()
+                    p_insertion.area_vec()
+                    p_insertion.fix_distance(subdivision=1)
+                    p_insertion.fix_intersection()
+                    p_insertion.area_vec()
+                    super_res.add_island(p_insertion)
+
+            super_res.add_island(self.slices[-1])
+            self.slices = super_res.slices
+
+
+        if seed:
+            np.random.rand(seed)
+        self.slices[0].area_vec()
+        self.surface_orientation = self.slices[0].area
+        surface_normal_dir = copy.deepcopy(self.surface_orientation)*(1/self.surface_orientation.mod())
+
+
+        z_orientation =  Point(0,0,1)
+        original = [Perimeter(),Perimeter()]
+        interpolated_all = []
+        interpolated_list = []
+
+
+        for n in range(self.slices.shape[0]-1):
+            self.slices[n+1].c_clockwise(self.surface_orientation)
+            for i in range(2):
+                original[i] = copy.deepcopy(self.slices[n+i])
+                original[i].points -= original[i].geometric_center()
+                original[i].area_vec()
+                original[i] = rotate_to(original[i], z_orientation)
+                if self._intrinsic_interpolation:
+                    original[i] = intrinsic_reference(original[i])
+            interpolated_list = interpolate(original,parcelation)
+            interpolated_all.append([n,[*interpolated_list]])
+        perimeter_insert(interpolated_all)
     def closebif(self, file_index, bif_list):
         '''
             There are 2 pairs of lines per connection created by merging
@@ -1136,6 +1318,7 @@ class Surface():
                         reordered_upper,
                         reordered_lower,
                         final_cond=[True,[M-1,N-1]])
+
             if check[1] or check2[1]:
                 return 0,0,[[m,n],check[0]],total_cost
             the_path = np.append(the_path, [[0,N-1]], axis=0)
