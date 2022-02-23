@@ -165,6 +165,10 @@ class Perimeter():
 
         norm2 = ((da**db).mod())**2
         if norm2 == 0:
+            return False
+            ## Could not find the reference for why the bellow code should be used
+            ## AS far as i'm concerned, two parallel lines should never intersect
+            ##so the return should always be false
             d1 = p1 - p3
             d2 = p2 - p3
             d3 = p1 - p4
