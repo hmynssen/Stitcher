@@ -24,7 +24,7 @@ Version 1.1:
 ##twine upload dist/*
 VERSION = '1.1'
 DESCRIPTION = 'Stitcher - mesh builder'
-LONG_DESCRIPTION = (__doc__ or '').split("\n")
+LONG_DESCRIPTION = __doc__
 setup(
         name="brain-stitcher",
         version=VERSION,
