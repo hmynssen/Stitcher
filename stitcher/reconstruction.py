@@ -450,11 +450,11 @@ class Surface():
         self.slices = np.empty(0) ##collection of Perimeters
         self._surface = False ##Fully built surface
         self._intersection_range = 3000
-        self.fix_limit = 0
+        self.fix_limit = 10000
         self.border_intersection = False ##
         self.surface_orientation = Point(0,0,0)
         self._intersection_counter = 0
-        self._intrinsic_interpolation = True
+        self._intrinsic_interpolation = True#False
 
     def set_parameters(self, **kwargs):
         error = 0
@@ -490,7 +490,7 @@ class Surface():
             out = 0
         else:
             error = 0
-    def build_surface(self, close_list=[]):
+    def build_surface(self, close_list=[], start_points={},skipping_cache=0): #implement cache memmory
         self.surfaceV = "" ##3d reconstructed surface
         self.surfaceE = ""
         total_shift = 0
@@ -518,7 +518,20 @@ class Surface():
             bad_connect = []
             rerun = False
             limit = 100000
+            dummy_counter=0
+
+            ## Basic cache memmory mechanism
+            for i in range(skipping_cache):
+                closest_point_dist = np.amin(dist_matrix)
+                allMin = np.where(dist_matrix == closest_point_dist)
+                list_cordinates = list(zip(allMin[0], allMin[1]))
+                dist_matrix[list_cordinates[0]]=np.inf
+                final_min_cord = list_cordinates[0]
+                f0 = final_min_cord[0]
+                f1 = final_min_cord[1]
+                dummy_counter+=1
             while not self.border_intersection:
+
                 if len(bad_connect) >= limit:
                     skip_intersection = True
                     print("Skiping intersection check")
@@ -535,15 +548,35 @@ class Surface():
                 final_min_cord = list_cordinates[0]
                 f0 = final_min_cord[0]
                 f1 = final_min_cord[1]
+                if str(n) in start_points.keys() and dummy_counter<=0:
+                    self.fix_limit = self.slices[n].points.shape[0]*self.slices[n+1].points.shape[0]
+                    P1 = start_points[f"{n}"][0]
+                    P2 = start_points[f"{n}"][1]
+                    print(f"\tStarting points selected for reconstruction number {n}:\n\t\t{P1}\n\t\t{P2}")
+                    f_bool=[False,False]
+                    for p_index_search,point_search in enumerate(self.slices[n].points):
+                        if point_search==Point(P1[0],P1[1],P1[2]):
+                            f0=p_index_search
+                            f_bool[0]=True
+                            break
+                    for p_index_search,point_search in enumerate(self.slices[n+1].points):
+                        if point_search==Point(P2[0],P2[1],P2[2]):
+                            f1=p_index_search
+                            f_bool[1]=True
+                            break
+                    if f_bool[0]*f_bool[1]:
+                        final_min_cord=[f0,f1]
 
-
-                ## Re-order the points: put the first connection at (0,0)
+                print("\t\tTry number:",dummy_counter+1)
+                print("\t\tf0,f1:",f0,f1)
+                print("\t\tpoint f0:", self.slices[n].points[f0])
+                print("\t\tpoint f1:", self.slices[n+1].points[f1])
                 reordered_upper =  self.__Reordering(
                     self.slices[n],
-                    final_min_cord[0])
+                    f0)
                 reordered_lower =  self.__Reordering(
                     self.slices[n+1],
-                    final_min_cord[1])
+                    f1)
                 cost_matrix =  self.__CostMatrix(reordered_upper,reordered_lower)
                 for bad in bad_connect:
                     if bad[0]>=f0:
@@ -566,7 +599,7 @@ class Surface():
                 if not isinstance(wrong, int):
                     for w in wrong:
                         if w[0]+f0 <= self.slices[n].points.shape[0]-2:
-                            wrong[0] += f0
+                            w[0] += f0
                         else:
                             w[0] += f0-self.slices[n].points.shape[0]-2
                         if w[1]+f1 <= self.slices[n+1].points.shape[0]-2:
@@ -574,10 +607,12 @@ class Surface():
                         else:
                             w[1] += f1-self.slices[n+1].points.shape[0]-2
                         if [w[0],w[1]] in bad_connect:
+                            dummy_counter+=1
                             dist_matrix[f0,f1] = np.inf
                         else:
                             bad_connect.append([w[0],w[1]])
                 else:
+                    dummy_counter+=1
                     dist_matrix[f0,f1] = np.inf
 
             ## The path is calculated based on the reordered points,
@@ -613,6 +648,7 @@ class Surface():
         self.out_surface = True
     def super_resolution(self, parcelation=1,seed=1):
         import copy
+        import matplotlib.pyplot as plt
         if parcelation==0:
             return
         def rotate_to(perimeter_rotate, vector):
@@ -625,7 +661,9 @@ class Surface():
             unity_area = copy.deepcopy(perimeter_rotate.area)*(1/perimeter_rotate.area.mod())
             theta = np.arccos(unity_vec.dot(unity_area))
             unity_vec = unity_area**unity_vec
-            unity_vec = unity_vec *(1/unity_vec .mod())
+            if unity_vec.mod()==0:
+                return perimeter_rotate
+            unity_vec = unity_vec *(1/unity_vec.mod())
             new_point = []
             for point in perimeter_rotate.points:
                 xcomp = (np.cos(theta)+unity_vec.x**2*(1-np.cos(theta)))*point.x +\
@@ -646,9 +684,10 @@ class Surface():
             '''
                 Returns intrinsic distance vectors of a perimeter
             '''
-            intrinsic = np.array([Point(0,0,0)]*(perimeter.points.shape[0]-1))
-            for index in range(perimeter.points.shape[0]-1):
-                intrinsic[index] = perimeter.points[index+1]-perimeter.points[index]
+            intrinsic = np.array([Point(0,0,0)]*(perimeter.points.shape[0]))
+            intrinsic[0] = copy.deepcopy(perimeter.points[0])
+            for index in range(1,perimeter.points.shape[0]):
+                intrinsic[index] = perimeter.points[index]-perimeter.points[index-1]
             return Perimeter(intrinsic)
 
         def extrinsic_reference(perimeter):
@@ -656,16 +695,20 @@ class Surface():
                 Returns extrinsic distance vectors of a perimeter with intrisic
                 reference. Also centers the geometric center to the origin
             '''
-            intrinsic = np.array([Point(0,0,0)]*(perimeter.points.shape[0]+1))
-            for index in range(perimeter.points.shape[0]):
-                intrinsic[index+1] = perimeter.points[index]+intrinsic[index]
-            extrinsic = Perimeter(intrinsic)
+            extrinsic = np.array([Point(0,0,0)]*(perimeter.points.shape[0]))
+            extrinsic[0] = copy.deepcopy(perimeter.points[0])
+            for index in range(1,perimeter.points.shape[0]):
+                extrinsic[index] = perimeter.points[index]+extrinsic[index-1]
+            extrinsic = Perimeter(extrinsic)
+            return extrinsic
             geo = extrinsic.geometric_center()
             for index in range(extrinsic.points.shape[0]):
                 extrinsic.points[index] -= geo
+                extrinsic.points[index] += self.slices[n].geometric_center()
+
             return extrinsic
 
-        def interpolate(perimeters,parcelation):
+        def interpolate(perimeters, parcelation):
             ##Returns list of all new permiters in order of height
             def linear_interpol(interpol_1, interpol_2, parcelation):
                 """
@@ -677,10 +720,22 @@ class Surface():
                     interpolation_sequence.append(newarray)
                 return interpolation_sequence
 
-            array1 = perimeters[0].flush_to_numpy()
-            array1 = array1[:,:2]
-            array2 = perimeters[1].flush_to_numpy()
-            array2 = array2[:,:2]
+            def to_complex(complex_perimeter):
+                array = complex_perimeter.flush_to_numpy()
+                complex = np.zeros(complex_perimeter.points.shape[0],dtype=np.cfloat)
+                for sup_index in range(complex_perimeter.points.shape[0]):
+                    complex[sup_index] = array[sup_index][0]+array[sup_index][1]*1j
+                return complex
+
+            def to_real(complex_points):
+                real = np.zeros((complex_points.shape[0],2))
+                for sup_index in range(complex_points.shape[0]):
+                    real[sup_index] = [complex_points[sup_index].real,complex_points[sup_index].imag]
+                return real
+
+            array1 = to_complex(perimeters[0])
+            array2 = to_complex(perimeters[1])
+
             if array1.shape[0]<array2.shape[0]:
                 diff = array2.shape[0]-array1.shape[0]
                 for i in range(diff):
@@ -689,22 +744,23 @@ class Surface():
                     array1 = np.insert(array1,insrert_list+1,newpoint,axis=0)
             elif array1.shape[0]>array2.shape[0]:
                 diff = array1.shape[0]-array2.shape[0]
-                insrert_list = np.random.randint(0,array2.shape[0]-1,size=diff)
-                for i in insrert_list:
+                for i in range(diff):
+                    insrert_list = np.random.randint(0,array2.shape[0]-1,1)
                     newpoint = (array2[i]+array2[i+1])/2
                     array2 = np.insert(array2,i+1,newpoint,axis=0)
 
-            transform1 = np.fft.fft2(array1)
-            transform2 = np.fft.fft2(array2)
+            transform1 = np.fft.fft(array1)
+            transform2 = np.fft.fft(array2)
             interpolation_sequence = linear_interpol(transform1,transform2,parcelation)
             resolved = []
             for inter in interpolation_sequence:
-                points = np.fft.ifft2(inter).real
-                points[-1] = points[0]
+                points = to_real(np.fft.ifft(inter))
                 points = [Point(px,py,0) for px,py in points]
+                #points.append(points[0])
                 perimeter = Perimeter(np.array(points))
                 if self._intrinsic_interpolation:
                     perimeter = extrinsic_reference(perimeter)
+                perimeter.points[-1]=perimeter.points[0]
                 resolved.append(perimeter)
             return resolved
 
@@ -714,22 +770,26 @@ class Surface():
                 height = self.slices[index+1].geometric_center()-self.slices[index].geometric_center()
                 self.slices[index].area_vec()
                 unity_area = copy.deepcopy(self.slices[index].area)*(1/self.slices[index].area.mod())
-                height = np.sqrt(height.dot(unity_area))
-                height = height*unity_area
-                return height
+                prod_aux = height.dot(unity_area)
+                if prod_aux>0:
+                    return np.sqrt(height.dot(unity_area))*unity_area
+                else:
+                    print("",end="")
+                    return -1*np.sqrt(height.dot(-1*unity_area))*unity_area
             super_res = Surface()
             fourier_original_coef = []
             for index,perimeter_insertion in perimeters:
                 super_res.add_island(self.slices[index])
                 newperimeter = copy.deepcopy(perimeter_insertion)
-                height = get_height(index)
+                height = get_height(index)#-1*nearest_point(index)#get_height(index)
                 total = len(newperimeter)
                 local_geo = self.slices[index].geometric_center()
                 for fourier_index, p_insertion in enumerate(newperimeter):
-                    p_insertion = rotate_to(p_insertion,self.slices[index].area)
                     for index2 in range(p_insertion.points.shape[0]):
                         p_insertion.points[index2] += local_geo
-                        p_insertion.points[index2] += height*((fourier_index+1)/(total+1))
+                    #p_insertion = rotate_to(p_insertion,self.slices[0].area)
+                    for index2 in range(p_insertion.points.shape[0]):
+                        p_insertion.points[index2] += (height+nearest[index])*((fourier_index+1)/(total+1))
                     p_insertion.remove_overlap()
                     p_insertion.area_vec()
                     p_insertion.fix_distance(subdivision=1)
@@ -738,34 +798,118 @@ class Surface():
                     super_res.add_island(p_insertion)
 
             super_res.add_island(self.slices[-1])
+            for insert_n in range(super_res.slices.shape[0]):
+                super_res.slices[insert_n] = rotate_to(super_res.slices[insert_n], self.surface_orientation)
+                for ori_points in range(super_res.slices[insert_n].points.shape[0]):
+                    super_res.slices[insert_n].points[ori_points]+=zero_center
+
             self.slices = super_res.slices
 
-
+        def nearest_point(n:int):
+            dist = np.inf
+            for first_index in range(self.slices[n].points.shape[0]):
+                for sec_index in range(self.slices[n+1].points.shape[0]):
+                    dist_aux = (self.slices[n].points[first_index]-self.slices[n+1].points[sec_index]).mod()
+                    if dist_aux<dist:
+                        dist = dist_aux
+                        displacement = self.slices[n].points[first_index]-self.slices[n+1].points[sec_index]
+            return displacement
         if seed:
             np.random.rand(seed)
         self.slices[0].area_vec()
         self.surface_orientation = self.slices[0].area
         surface_normal_dir = copy.deepcopy(self.surface_orientation)*(1/self.surface_orientation.mod())
 
+        def plot_interpolation(interpolation_slice, upper, lower, diff_vector, counter):
+            UPPERX = []
+            UPPERY = []
+            LOWERX = []
+            LOWERY = []
+            INTERX = []
+            INTERY = []
+            for upper_index_plot in range(upper.points.shape[0]):
+                UPPERX.append(upper.points[upper_index_plot].x)
+                UPPERY.append(upper.points[upper_index_plot].y)
+
+            for lower_index_plot in range(lower.points.shape[0]):
+                LOWERX.append(lower.points[lower_index_plot].x)
+                LOWERY.append(lower.points[lower_index_plot].y)
+
+            for inter_index_plot in range(interpolation_slice.points.shape[0]):
+                INTERX.append(interpolation_slice.points[inter_index_plot].x+horizontal_disp.x/2)
+                INTERY.append(interpolation_slice.points[inter_index_plot].y+horizontal_disp.y/2)
+
+            plt.plot(UPPERX,UPPERY,alpha=0.5)
+            plt.plot(LOWERX,LOWERY,alpha=0.5)
+            plt.plot(INTERX,INTERY,c="red")
+            plt.arrow(self.slices[n].points[upper_counter].x,
+                    self.slices[n].points[upper_counter].y,
+                    diff_vector.x,
+                    diff_vector.y,
+                    width=0.002,
+                    head_width=0.5,
+                    head_length=0.55,
+                    overhang=0.4)
+            plt.xlim(-20,25)
+            plt.ylim(-15,15)
+            if counter<10:
+                print("in")
+                plt.savefig("C:/Users/hgess/Desktop/Fourier/disp/0000"+str(counter)+".jpg",bbox_inches='tight')
+            elif counter<100:
+                plt.savefig("C:/Users/hgess/Desktop/Fourier/disp/000"+str(counter)+".jpg",bbox_inches='tight')
+            elif counter<1000:
+                plt.savefig("C:/Users/hgess/Desktop/Fourier/disp/00"+str(counter)+".jpg",bbox_inches='tight')
+            elif counter<10000:
+                plt.savefig("C:/Users/hgess/Desktop/Fourier/disp/0"+str(counter)+".jpg",bbox_inches='tight')
+            else:
+                plt.savefig("C:/Users/hgess/Desktop/Fourier/disp/"+str(counter)+".jpg",bbox_inches='tight')
+            plt.clf()
 
         z_orientation =  Point(0,0,1)
         original = [Perimeter(),Perimeter()]
         interpolated_all = []
         interpolated_list = []
-
-
+        zero_center = self.slices[0].geometric_center()
+        nearest = []
+        if 1:
+            for n in range(self.slices.shape[0]):
+                self.slices[n].c_clockwise(self.surface_orientation)
+                for ori_points in range(self.slices[n].points.shape[0]):
+                    self.slices[n].points[ori_points]-=zero_center
+                self.slices[n] = rotate_to(self.slices[n], z_orientation)
+                self.slices[n] = extrinsic_reference(intrinsic_reference(self.slices[n]))
+        img_counter = 0
+        single_img = False
         for n in range(self.slices.shape[0]-1):
-            self.slices[n+1].c_clockwise(self.surface_orientation)
-            for i in range(2):
-                original[i] = copy.deepcopy(self.slices[n+i])
-                original[i].points -= original[i].geometric_center()
-                original[i].area_vec()
-                original[i] = rotate_to(original[i], z_orientation)
-                if self._intrinsic_interpolation:
-                    original[i] = intrinsic_reference(original[i])
-            interpolated_list = interpolate(original,parcelation)
-            interpolated_all.append([n,[*interpolated_list]])
-        perimeter_insert(interpolated_all)
+            for upper_counter in range(0,self.slices[n].points.shape[0],2):
+                for lower_counter in range(0,self.slices[n+1].points.shape[0],2):
+                    img_counter += 1
+                    for i in range(2):
+                        original[i] = copy.deepcopy(self.slices[n+i])
+                        horizontal_disp = Point(0,0,0)
+                        if i==1:
+                            horizontal_disp = self.slices[n].points[upper_counter]-self.slices[n+1].points[lower_counter]
+                            #nearest_point(n)#original[1].geometric_center()-original[0].geometric_center()
+                            horizontal_disp = Point(horizontal_disp.x,horizontal_disp.y,0)
+                            original[i].points -= horizontal_disp
+                            nearest.append(horizontal_disp)
+                        if i==200:
+                            displacement = nearest_point(n)
+                            nearest.append(displacement)
+                            original[i].points -= displacement
+                        original[i].area_vec()
+                        if self._intrinsic_interpolation:
+                            original[i] = intrinsic_reference(original[i])
+                    interpolated_list = interpolate(original,parcelation)
+                    plot_interpolation(*interpolated_list,self.slices[n],self.slices[n+1],horizontal_disp,img_counter)
+                    interpolated_all.append([n,[*interpolated_list]])
+                    if single_img:
+                        break
+                if single_img:
+                    break
+            if single_img:
+                break
+        #perimeter_insert(interpolated_all)
     def closebif(self, file_index, bif_list):
         '''
             There are 2 pairs of lines per connection created by merging
