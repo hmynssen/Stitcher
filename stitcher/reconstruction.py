@@ -12,16 +12,23 @@ class Point():
         self.y = othery
         self.z = otherz
 
+
+    def mod(self):
+    	return pow((self.x ** 2) + (self.y ** 2) + (self.z ** 2), 0.5)
+    def dot(self, v):
+        return (self.x * v.x) + (self.y * v.y) + (self.z * v.z)
+    def cross(self, u):
+        ##Crossproduct
+    	return Point(
+            self.y * u.z - self.z * u.y,
+            self.z * u.x - self.x * u.z,
+            self.x * u.y - self.y * u.x)
     def __pow__(v, u):
         ##Crossproduct
     	return Point(
             v.y * u.z - v.z * u.y,
             v.z * u.x - v.x * u.z,
             v.x * u.y - v.y * u.x)
-    def mod(self):
-    	return pow((self.x ** 2) + (self.y ** 2) + (self.z ** 2), 0.5)
-    def dot(self, v):
-        return (self.x * v.x) + (self.y * v.y) + (self.z * v.z)
     def __add__(v, u):
         return Point(v.x + u.x, v.y + u.y, v.z + u.z)
     def __sub__(v, u):
@@ -280,10 +287,10 @@ class Perimeter():
                             for replace in range(i+1, j+1):
                                 self.points[replace] = aux[replace-i-1]
 
-
                         break
             ##Loop break if many intersections are encoutered
             Loops += 1
+
             if not found:
                 check = False
             if Loops > 20:
@@ -450,7 +457,7 @@ class Surface():
         self.slices = np.empty(0) ##collection of Perimeters
         self._surface = False ##Fully built surface
         self._intersection_range = 3000
-        self.fix_limit = 10000
+        self.fix_limit = 1000
         self.border_intersection = False ##
         self.surface_orientation = Point(0,0,0)
         self._intersection_counter = 0
@@ -509,8 +516,8 @@ class Surface():
                 2) has the smallest possible area
                 3) is closed
             -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
-                If we find a point that all of its connections create
-            intersections, than we must never use this point in our final
+                If we find a point (edge) that all of its connections (triangles)
+            create intersections, than we must never use this point in our final
             mesh. So we list all this points per stitched surface and exclude
             them from our path find algorithm by setting its value to
             infinity.
@@ -756,7 +763,6 @@ class Surface():
             for inter in interpolation_sequence:
                 points = to_real(np.fft.ifft(inter))
                 points = [Point(px,py,0) for px,py in points]
-                #points.append(points[0])
                 perimeter = Perimeter(np.array(points))
                 if self._intrinsic_interpolation:
                     perimeter = extrinsic_reference(perimeter)
