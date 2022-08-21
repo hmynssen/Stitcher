@@ -37,6 +37,8 @@ class Point():
         return Point(self.x*a,self.y*a,self.z*a)
     def __rmul__(self, a:float):
         return Point(self.x*a,self.y*a,self.z*a)
+    def __truediv__(self, a:float):
+        return Point(self.x/a,self.y/a,self.z/a)
     def __eq__(self, other):
         if isinstance(other, Point):
             return (self.x==other.x and self.y==other.y and self.z==other.z)
@@ -55,6 +57,7 @@ class Perimeter():
     def __init__(self, *args):
         self.normal = Point(0,0,0)
         self.area = Point(0,0,0)
+        self.total_length = 0
         self.blend_points = np.array([])
         if args:
             if not isinstance(args[0][0], Point):
@@ -74,6 +77,10 @@ class Perimeter():
                 self.points = args[0]
         else:
             self.points = np.empty(0)
+        if self.points.shape[0]>1:
+            self.fix_intersection()
+            self.area_vec()
+            self.compute_length()
 
     def append(self, np_array):
     	self.points = np.append(self.points, np.array([np_array]), axis=0)
@@ -134,6 +141,12 @@ class Perimeter():
             v2 = self.points[n+1]-self.points[0]
             cross = v1**v2
             self.area += cross*(1/2)
+    def compute_length(self):
+        self.total_length = 0
+        for n in range(self.points.shape[0]-1):
+            v1 = self.points[n]
+            v2 = self.points[n+1]
+            self.total_length += (v2-v1).mod()
     def c_clockwise(self, global_orientation=Point(1,0,0)):
         ## Reorients surface to counter-clockwise
         ##and creates a area vector
@@ -504,7 +517,7 @@ class Surface():
         self.slices[0].area_vec()
         self.surface_orientation = self.slices[0].area
         for n in range(self.slices.shape[0]-1):
-            print(n)
+            # print(n)
             self.slices[n+1].c_clockwise(self.surface_orientation)
             dist_matrix = self.__CostMatrix(self.slices[n],self.slices[n+1])
             self.border_intersection = False
@@ -574,10 +587,10 @@ class Surface():
                     if f_bool[0]*f_bool[1]:
                         final_min_cord=[f0,f1]
 
-                print("\t\tTry number:",dummy_counter+1)
-                print("\t\tf0,f1:",f0,f1)
-                print("\t\tpoint f0:", self.slices[n].points[f0])
-                print("\t\tpoint f1:", self.slices[n+1].points[f1])
+                # print("\t\tTry number:",dummy_counter+1)
+                # print("\t\tf0,f1:",f0,f1)
+                # print("\t\tpoint f0:", self.slices[n].points[f0])
+                # print("\t\tpoint f1:", self.slices[n+1].points[f1])
                 reordered_upper =  self.__Reordering(
                     self.slices[n],
                     f0)
@@ -622,6 +635,48 @@ class Surface():
                     dummy_counter+=1
                     dist_matrix[f0,f1] = np.inf
 
+            ##FAN ARTIFACT LOG
+            c1_fan_artifact=1
+            c2_fan_artifact=1
+            p1_fan_artifact=the_path[0,0]
+            p2_fan_artifact=the_path[0,1]
+            for index_fan_artifact, pair_fan_artifact in enumerate(the_path):
+                if index_fan_artifact==0:
+                    continue
+                if p1_fan_artifact==pair_fan_artifact[0]:
+                    c1_fan_artifact += 1
+                else:
+                    c1_fan_artifact = 1
+                if p2_fan_artifact==pair_fan_artifact[1]:
+                    c2_fan_artifact += 1
+                else:
+                    c2_fan_artifact = 1
+
+                if c1_fan_artifact>10:
+                    fan_edge1 = reordered_upper.points[pair_fan_artifact[0]]-reordered_lower.points[p2_fan_artifact]
+                    fan_edge2 = reordered_upper.points[pair_fan_artifact[0]]-reordered_lower.points[pair_fan_artifact[1]]
+                    surface_vec_fan_artifact=fan_edge1**fan_edge2
+                    surface_vec_fan_artifact=surface_vec_fan_artifact/surface_vec_fan_artifact.mod()
+                    ori_fan = self.surface_orientation/self.surface_orientation.mod()
+                    angle_fan_artifact = max(surface_vec_fan_artifact.dot(ori_fan),surface_vec_fan_artifact.dot(-1*ori_fan))
+                    angle_fan_artifact = np.arccos(angle_fan_artifact)*180/np.pi
+                    if angle_fan_artifact<=15:
+                        print(f"Fan artifact found at {n}th reconstruction")
+                        break
+                if c2_fan_artifact>10:
+                    fan_edge1 = reordered_lower.points[pair_fan_artifact[1]]-reordered_upper.points[p1_fan_artifact]
+                    fan_edge2 = reordered_lower.points[pair_fan_artifact[1]]-reordered_upper.points[pair_fan_artifact[0]]
+                    surface_vec_fan_artifact=fan_edge1**fan_edge2
+                    surface_vec_fan_artifact=surface_vec_fan_artifact/surface_vec_fan_artifact.mod()
+                    ori_fan = self.surface_orientation/self.surface_orientation.mod()
+                    angle_fan_artifact = max(surface_vec_fan_artifact.dot(ori_fan),surface_vec_fan_artifact.dot(-1*ori_fan))
+                    angle_fan_artifact = np.arccos(angle_fan_artifact)*180/np.pi
+                    if angle_fan_artifact<=15:
+                        print(f"Fan artifact found at {n}th reconstruction")
+                        break
+
+                p1_fan_artifact = pair_fan_artifact[0]
+                p2_fan_artifact = pair_fan_artifact[1]
             ## The path is calculated based on the reordered points,
             ##so we should invert the transformation so that we have
             ##the path for the original set of points
@@ -1006,7 +1061,7 @@ class Surface():
     ## Not meant for end-user
     def __CloseSurface(self, closing_points, area_vec, shift=0, index_list = None):
         '''
-            Implementation of a ear cliping algorithm to create a plane triangulation.
+            Implementation of a ear clipping algorithm to create a plane triangulation.
 
             Currently using a simpler and more comprehensible algorithm from
 
@@ -1015,7 +1070,7 @@ class Surface():
                 Pattern Recognition Letters 14.9 (1993): 719-722.
 
             The idea is to define what is mathematically an ear (a type of triangle), and
-        start cliping/slicing ear until there no more to be cliped.
+        start clipping/slicing ear until there no more to be clipped.
         '''
         number_points = closing_points.shape[0]-1
         points = np.array([[Point(0,0,0),0]]*number_points)
