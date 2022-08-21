@@ -510,6 +510,35 @@ class Surface():
             out = 0
         else:
             error = 0
+    def estimate_geometric_values(self):
+        """
+            Ribeiro PF, Ventura-Antunes L, Gabi M, Mota B, Grinberg LT, Farfel
+            JM, Ferretti-Rebustini RE, Leite RE, Filho WJ, Herculano-Houzel S.
+            The human cerebral cortex is neither one nor many: neuronal
+            distribution reveals two quantitatively different zones in the gray
+            matter, three in the white matter, and explains local variations
+            in cortical folding. Front Neuroanat. 2013 Sep 2;7:28.
+            doi: 10.3389/fnana.2013.00028. PMID: 24032005; PMCID: PMC3759024.
+        """
+        def b_area(t,a1,a2,p1,p2):
+            return np.sqrt((a1-a2)**2+(t*(p1+p2)/2)**2)
+
+        def b_vol(t,a1,a2):
+            return t*(a1+a2+np.sqrt(a1*a2))/3
+
+        self.area_est = 0
+        self.vol_est = 0
+        for i in range(self.slices.shape[0]-1):
+            a1 = self.slices[i].area.mod()
+            a2 = self.slices[i+1].area.mod()
+            p1 = self.slices[i].total_length
+            p2 = self.slices[i+1].total_length
+            g1 = self.slices[i].geometric_center()
+            g2 = self.slices[i+1].geometric_center()
+            t = abs((g2-g1).dot(self.slices[i].area/self.slices[i].area.mod()))
+            self.area_est += b_area(t,a1,a2,p1,p2)
+            self.vol_est += b_vol(t,a1,a2)
+
     def build_surface(self, close_list=[], start_points={},skipping_cache=0): #implement cache memmory
         self.surfaceV = "" ##3d reconstructed surface
         self.surfaceE = ""
