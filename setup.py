@@ -17,12 +17,17 @@ The main usage is for recreating brain models from rare species, i.e., especies 
 Version 1.1:
     -New super resolution method using Fourier Transform
     -Fixed fix_intersection() method from Perimeter() to properly handle rare parallel lines case
-    -Example on how to use will come on version 1.2 with some results
+
+Version 1.2:
+    -FIX: Point division by number added as operation (division)
+    -NEW: Perimeter legth added
+    -NEW: estimation of volume and lateral area by numerical approximation prior to the reconstruction (doi: 10.3389/fnana.2013.00028)
+    -NEW: report of possible topological artifacts after build the 3D mesh
 
 '''
 ##python3 setup.py sdist bdist_wheel
 ##twine upload dist/*
-VERSION = '1.1'
+VERSION = '1.2'
 DESCRIPTION = 'Stitcher - mesh builder'
 LONG_DESCRIPTION = __doc__
 setup(
