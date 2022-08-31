@@ -24,10 +24,13 @@ Version 1.2:
     -NEW: estimation of volume and lateral area by numerical approximation prior to the reconstruction (doi: 10.3389/fnana.2013.00028)
     -NEW: report of possible topological artifacts after build the 3D mesh
 
+Version 1.2.1:
+    -CHANGE: fixing the intersection is optinal when making a new Perimeter
+
 '''
 ##python3 setup.py sdist bdist_wheel
 ##twine upload dist/*
-VERSION = '1.2'
+VERSION = '1.2.1'
 DESCRIPTION = 'Stitcher - mesh builder'
 LONG_DESCRIPTION = __doc__
 setup(
