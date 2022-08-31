@@ -54,11 +54,15 @@ class Point():
 
 class Perimeter():
 
-    def __init__(self, *args):
+    def __init__(self, *args, **kwargs):
         self.normal = Point(0,0,0)
         self.area = Point(0,0,0)
         self.total_length = 0
         self.blend_points = np.array([])
+        if not "full_init" in kwargs.keys():
+            full_init = True
+        else:
+            full_init = kwargs["full_init"]
         if args:
             if not isinstance(args[0][0], Point):
                 ## np array of classes seems to point (memory level) at
@@ -77,7 +81,7 @@ class Perimeter():
                 self.points = args[0]
         else:
             self.points = np.empty(0)
-        if self.points.shape[0]>1:
+        if self.points.shape[0]>1 and full_init:
             self.fix_intersection()
             self.area_vec()
             self.compute_length()
@@ -538,7 +542,6 @@ class Surface():
             t = abs((g2-g1).dot(self.slices[i].area/self.slices[i].area.mod()))
             self.area_est += b_area(t,a1,a2,p1,p2)
             self.vol_est += b_vol(t,a1,a2)
-
     def build_surface(self, close_list=[], start_points={},skipping_cache=0): #implement cache memmory
         self.surfaceV = "" ##3d reconstructed surface
         self.surfaceE = ""
@@ -1164,7 +1167,7 @@ class Surface():
                     continue
                 if index==p_i+1 or index==p1+1 or index==p3+1:
                     continue
-                if Perimeter().find_intersection(
+                if Perimeter(full_init=False).find_intersection(
                     GSP[index][0],
                     GSP[index+1][0],
                     GSP[p1][0],
@@ -1624,7 +1627,7 @@ class Surface():
             contour.points[final_min_cord].z
             )
 
-        return Perimeter(np.array(reordered))
+        return Perimeter(np.array(reordered),full_init=False)
     def __FixPathOrder(self, path, final_min_cord : list, M, N) -> np.ndarray:
         fix_path = np.zeros(path.shape, dtype=int)
         for i in range(path.shape[0]):
