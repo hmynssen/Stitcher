@@ -390,10 +390,10 @@ class Perimeter():
         '''
             Analogous to flush_to_numpy(), but returns an array of Point()s
         '''
-        perimeter = [0 for i in range(flushed.shape[0])]
+        perimeter = np.empty(flushed.shape[0],Point)
         for index,p in enumerate(flushed):
             perimeter[index] = Point(flushed[index,0],flushed[index,1],flushed[index,2])
-        return np.array(perimeter)
+        return perimeter
     def __str__(self):
         return "{L}\nwith shape = {S}".format(
                     L = [self.points[i].__str__()\
