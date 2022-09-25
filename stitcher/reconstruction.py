@@ -118,10 +118,6 @@ class Perimeter():
             Remove points that are closer than delta times the mean distance from
         each other.
         """
-        def neighbourhood(p1, p2, mean, delta) -> bool:
-            if (self.points[i] - self.points[j]).mod() <= delta*mean:
-                return True
-            return False
         aux = self.points
         counter = 0
         mean = 0
@@ -134,7 +130,7 @@ class Perimeter():
         mean = mean/(self.points.shape[0]-1-correction)
         for i in range(self.points.shape[0]-correction):
             for j in range(i+1,self.points.shape[0]-correction):
-                if neighbourhood(self.points[i],self.points[j],mean, delta):
+                if (self.points[i] - self.points[j]).mod() <= delta*mean:
                     aux = np.delete(aux,i-counter)
                     counter += 1
         self.points = aux
@@ -394,10 +390,10 @@ class Perimeter():
         '''
             Analogous to flush_to_numpy(), but returns an array of Point()s
         '''
-        perimeter = np.zeros((flushed.shape[0],3))
+        perimeter = [0 for i in range(flushed.shape[0])]
         for index,p in enumerate(flushed):
             perimeter[index] = Point(flushed[index,0],flushed[index,1],flushed[index,2])
-        return perimeter
+        return np.array(perimeter)
     def __str__(self):
         return "{L}\nwith shape = {S}".format(
                     L = [self.points[i].__str__()\
@@ -540,6 +536,7 @@ class Surface():
             g1 = self.slices[i].geometric_center()
             g2 = self.slices[i+1].geometric_center()
             t = abs((g2-g1).dot(self.slices[i].area/self.slices[i].area.mod()))
+            #print(f"p1/(N1*t): {p1/self.slices[i].points.shape[0]/t:.2f}\np2/(N2*t): {p2/self.slices[i+1].points.shape[0]/t:.2f}\nt: {t:.2f}".replace(".",","))
             self.area_est += b_area(t,a1,a2,p1,p2)
             self.vol_est += b_vol(t,a1,a2)
     def build_surface(self, close_list=[], start_points={},skipping_cache=0): #implement cache memmory
