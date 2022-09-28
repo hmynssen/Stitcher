@@ -124,11 +124,7 @@ class Perimeter():
             correction = 1
         else:
             correction = 0
-<<<<<<< HEAD
         for i in range(self.points.shape[0]-correction):
-=======
-        for i in range(self.points.shape[0]-correction-2):
->>>>>>> ed86435e87c8119a3f49485da8d01d99b9966175
             va = self.points[i-1] - self.points[i]
             vb = self.points[i] - self.points[i+1]
             if np.arccos(va.dot(vb)) < min_angle and np.arccos(va.dot(vb))>0:
