@@ -113,6 +113,24 @@ class Perimeter():
                 self.points = np.insert(self.points, i+counter+1, points_list)
                 counter += aux
                 aux = 0
+    def remove_by_angle(self,min_angle=np.pi/180):
+        """
+            Remove points that are closer than delta times the mean distance from
+        each other.
+        """
+        aux = self.points
+        counter = 0
+        if self.points[0]==self.points[-1]:
+            correction = 1
+        else:
+            correction = 0
+        for i in range(self.points.shape[0]-correction-2):
+            va = self.points[i-1] - self.points[i]
+            vb = self.points[i] - self.points[i+1]
+            if np.arccos(va.dot(vb)) < min_angle and np.arccos(va.dot(vb))>0:
+                aux = np.delete(aux,i-counter)
+                counter += 1
+        self.points = aux
     def remove_overlap(self,delta=0.01):
         """
             Remove points that are closer than delta times the mean distance from
