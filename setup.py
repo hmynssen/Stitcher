@@ -29,12 +29,15 @@ Version 1.2.1:
 
 Version 1.2.2:
     -Fix: loading from cache now works as expected
-    -NEW: Perimeter.remove_by_angle(lmit_in_radians) method to remove vertices that with angle<limit
+    -NEW: Perimeter.remove_by_angle(limit_in_radians) method to remove vertices that with angle<limit
+
+Version 1.2.2.1:
+    -Fix: Intersection check limit (reconstruction.Surface.intersection_limit) is now a property of Surface intead of being hard coded
 
 '''
 ##python3 setup.py sdist bdist_wheel
 ##twine upload dist/*
-VERSION = '1.2.2'
+VERSION = '1.2.2.1'
 DESCRIPTION = 'Stitcher - mesh builder'
 LONG_DESCRIPTION = __doc__
 setup(
