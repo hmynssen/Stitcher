@@ -489,6 +489,7 @@ class Surface():
         self._surface = False ##Fully built surface
         self._intersection_range = 3000
         self.fix_limit = 1000
+        self.intersection_limit = 100000
         self.border_intersection = False ##
         self.surface_orientation = Point(0,0,0)
         self._intersection_counter = 0
@@ -584,7 +585,6 @@ class Surface():
             '''
             bad_connect = []
             rerun = False
-            limit = 100000
             dummy_counter=0
 
             ## Basic cache memmory mechanism
@@ -599,7 +599,7 @@ class Surface():
                 dummy_counter+=1
             while not self.border_intersection:
 
-                if len(bad_connect) >= limit:
+                if len(bad_connect) >= self.intersection_limit:
                     skip_intersection = True
                     print("Skiping intersection check")
                 else:
