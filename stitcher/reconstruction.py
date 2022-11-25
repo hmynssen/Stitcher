@@ -494,6 +494,7 @@ class Surface():
         self.surface_orientation = Point(0,0,0)
         self._intersection_counter = 0
         self._intrinsic_interpolation = True#False
+        self.self_intersection = False
 
     def set_parameters(self, **kwargs):
         error = 0
@@ -601,6 +602,7 @@ class Surface():
 
                 if len(bad_connect) >= self.intersection_limit:
                     skip_intersection = True
+                    self.self_intersection = True
                     print("Skiping intersection check")
                 else:
                     skip_intersection = False

@@ -1,5 +1,3 @@
-from setuptools import setup, find_packages
-
 ''' Stitcher package is a 3D mesh builder
 
 It was developed by metaBIO lab member Heitor Gessner as part of his master thesis.
@@ -34,10 +32,15 @@ Version 1.2.2:
 Version 1.2.2.1:
     -Fix: Intersection check limit (reconstruction.Surface.intersection_limit) is now a property of Surface intead of being hard coded
 
+Version 1.2.3:
+    -NEW: Added Surface.self_intersection boolean property to report problematic surface build
+
 '''
+
+from setuptools import setup, find_packages
 ##python3 setup.py sdist bdist_wheel
 ##twine upload dist/*
-VERSION = '1.2.2.1'
+VERSION = '1.2.3'
 DESCRIPTION = 'Stitcher - mesh builder'
 LONG_DESCRIPTION = __doc__
 setup(
