@@ -14,18 +14,18 @@ class Point():
 
 
     def mod(self):
-    	return pow((self.x ** 2) + (self.y ** 2) + (self.z ** 2), 0.5)
+        return pow((self.x ** 2) + (self.y ** 2) + (self.z ** 2), 0.5)
     def dot(self, v):
         return (self.x * v.x) + (self.y * v.y) + (self.z * v.z)
     def cross(self, u):
         ##Crossproduct
-    	return Point(
+        return Point(
             self.y * u.z - self.z * u.y,
             self.z * u.x - self.x * u.z,
             self.x * u.y - self.y * u.x)
     def __pow__(v, u):
         ##Crossproduct
-    	return Point(
+        return Point(
             v.y * u.z - v.z * u.y,
             v.z * u.x - v.x * u.z,
             v.x * u.y - v.y * u.x)
@@ -87,8 +87,8 @@ class Perimeter():
             self.compute_length()
 
     def append(self, np_array):
-    	self.points = np.append(self.points, np.array([np_array]), axis=0)
-    def fix_distance(self, subdivision = 3):
+        self.points = np.append(self.points, np.array([np_array]), axis=0)
+    def fix_distance(self, subdivision = 1):
         ## Creates new points between points that are too
         ##far apart from each other
         counter = 0
@@ -113,6 +113,42 @@ class Perimeter():
                 self.points = np.insert(self.points, i+counter+1, points_list)
                 counter += aux
                 aux = 0
+    def subdivide(self):
+        ## Creates new points no matter what
+        counter = 0
+        for i in range(self.points.shape[0]-2):
+            new_point = (self.points[i+counter+1]-self.points[i+counter])/2
+            new_point += self.points[i+counter]
+            self.points = np.insert(self.points, i+counter+1, [new_point])
+            counter += 1
+    def spread_sulci(self,close=1e-1):
+        def move(index_i, index_j):
+            indexes = [index_i,index_j]
+            for di,dj in zip(indexes,indexes[::-1]):
+                dir1 = self.points[di+1]-self.points[di]
+                dir2 = self.points[di-1]-self.points[di]
+                new_points = [close*dir1+self.points[di],
+                            close*dir2+self.points[di]]
+                test1 = self.find_intersection(new_points[0],new_points[1],
+                                self.points[dj],self.points[dj+1])
+                test2 = self.find_intersection(new_points[0],new_points[1],
+                                self.points[dj],self.points[dj-1])
+                if not test1 and not test2:
+                    break
+            return new_points[::-1],di
+        counter = 0
+        for i in range(self.points.shape[0]-3):
+            index_i = i+counter
+            for j in range(i+2,self.points.shape[0]-1-counter):
+
+                dist = (self.points[index_i]-self.points[j+counter]).mod()
+                if dist<=close:
+                    new_points,chosen_index = move(index_i, j+counter)
+                    self.points = np.insert(self.points, chosen_index+1, new_points)
+                    self.points = np.delete(self.points, chosen_index, axis=0)
+                    counter += 1
+                    break
+        print(counter)
     def remove_by_angle(self,min_angle=np.pi/180):
         """
             Remove points that are closer than delta times the mean distance from
@@ -426,8 +462,8 @@ class Perimeter():
         N = u.points.shape[0]
         cost_matrix = np.zeros((M-1,N-1))
         for m in range(M-1):
-        	for n in range(N-1):
-        		cost_matrix[m,n] = (v.points[m]-u.points[n]).mod()
+            for n in range(N-1):
+                cost_matrix[m,n] = (v.points[m]-u.points[n]).mod()
         allMin = np.where(cost_matrix==np.amin(cost_matrix))
         final_min_cord = list(zip(allMin[0], allMin[1]))[0]
         vari = M+N
