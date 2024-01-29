@@ -1,5 +1,5 @@
 import numpy as np
-
+import copy
 class Point():
 
     def __init__(self, newx, newy, newz):
@@ -167,27 +167,28 @@ class Perimeter():
                 aux = np.delete(aux,i-counter)
                 counter += 1
         self.points = aux
-    def remove_overlap(self,delta=0.01):
+    def remove_overlap(self,delta=0.0):
         """
             Remove points that are closer than delta times the mean distance from
         each other.
         """
-        aux = self.points
+        aux = copy.deepcopy(self.points)
         counter = 0
         mean = 0
-        if self.points[0]==self.points[-1]:
-            correction = 1
-        else:
-            correction = 0
-        for i in range(self.points.shape[0]-1-correction):
+        for i in range(self.points.shape[0]-1):
             mean += (self.points[i]-self.points[i+1]).mod()
-        mean = mean/(self.points.shape[0]-1-correction)
-        for i in range(self.points.shape[0]-correction):
-            for j in range(i+1,self.points.shape[0]-correction):
-                if (self.points[i] - self.points[j]).mod() <= delta*mean:
-                    aux = np.delete(aux,i-counter)
+        mean = mean/(self.points.shape[0]-1)
+        for i in range(self.points.shape[0]-1):
+            counter = 0
+            for j in range(i+1,self.points.shape[0]):
+                if j-counter>=aux.shape[0]:
+                    break
+                if (aux[i] - aux[j-counter]).mod() <= delta*mean:
+                    aux = np.delete(aux,j-counter)
                     counter += 1
         self.points = aux
+        if not self.points[0]==self.points[-1]:
+            self.append(self.points[0])
     def area_vec(self):
         self.area = Point(0,0,0)
         for n in range(1,self.points.shape[0]-1):
@@ -289,23 +290,16 @@ class Perimeter():
                 for j in range(i+2, p_points-1):
                     if i==0 and j==p_points-2:
                         break
-                    '''
-                        If we find a point that rests exactly on top of a line
-                    segment, then we will perturbe it by a small amount to avoid
-                    having a self intersecting surface on the final mesh.
-                        Trying to figure out w
-                    '''
                     if self.find_intersection(
                             self.points[i],
                             self.points[i+1],
                             self.points[j],
                             self.points[j+1]):
                         found = True
-                        aux = np.array([Point(0,0,0)])
-                        for fix in self.points[(i+1):(j+1)]:
-                            aux = np.append(aux,fix)
-                        aux = np.delete(aux,0)
-                        aux = np.flip(aux, axis=0)
+                        aux = copy.deepcopy(self.points[(i+1):(j+1)])
+                        aux = np.flip(self.points[(i+1):(j+1)], axis=0)
+                        self.points[i+1:j+1] = np.flip(self.points[(i+1):(j+1)], axis=0)
+
                         if aux.size != 0:
                             for blends in range(self.blend_points.shape[0]):
                                 sup = np.copy(self.blend_points[blends])
@@ -351,16 +345,16 @@ class Perimeter():
                                 if count1 and count2 and count3 and count4:
                                     self.blend_points[blends][1] = sup[2]
                                     self.blend_points[blends][2] = sup[1]
-                            for replace in range(i+1, j+1):
-                                self.points[replace] = aux[replace-i-1]
+                            # for replace in range(i+1, j+1):
+                            # self.points[i+1:j+1] = aux
 
-                        break
+                        # break
             ##Loop break if many intersections are encoutered
             Loops += 1
 
             if not found:
                 check = False
-            if Loops > 20:
+            if Loops > 200:
                 check = False
     def islands_ensemble(self, other):
         """
@@ -561,7 +555,7 @@ class Surface():
                 np.array([Perimeter()]),
                 axis=0
                 )
-    def mesh_out(self,path="",name="NoName"): #implement and comment
+    def mesh_out(self,path="",name="NoName"):
         if self.out_surface:
             out = 0
         else:
@@ -589,20 +583,22 @@ class Surface():
             a2 = self.slices[i+1].area.mod()
             p1 = self.slices[i].total_length
             p2 = self.slices[i+1].total_length
+            
+            ##thickness computation
             g1 = self.slices[i].geometric_center()
             g2 = self.slices[i+1].geometric_center()
             t = abs((g2-g1).dot(self.slices[i].area/self.slices[i].area.mod()))
-            #print(f"p1/(N1*t): {p1/self.slices[i].points.shape[0]/t:.2f}\np2/(N2*t): {p2/self.slices[i+1].points.shape[0]/t:.2f}\nt: {t:.2f}".replace(".",","))
+
             self.area_est += b_area(t,a1,a2,p1,p2)
             self.vol_est += b_vol(t,a1,a2)
-    def build_surface(self, close_list=[], start_points={},skipping_cache=0): #implement cache memmory
+
+    def build_surface(self, close_list=[], start_points={},skipping_cache=0):
         self.surfaceV = "" ##3d reconstructed surface
         self.surfaceE = ""
         total_shift = 0
         self.slices[0].area_vec()
         self.surface_orientation = self.slices[0].area
         for n in range(self.slices.shape[0]-1):
-            # print(n)
             self.slices[n+1].c_clockwise(self.surface_orientation)
             dist_matrix = self.__CostMatrix(self.slices[n],self.slices[n+1])
             self.border_intersection = False
@@ -672,10 +668,6 @@ class Surface():
                     if f_bool[0]*f_bool[1]:
                         final_min_cord=[f0,f1]
 
-                # print("\t\tTry number:",dummy_counter+1)
-                # print("\t\tf0,f1:",f0,f1)
-                # print("\t\tpoint f0:", self.slices[n].points[f0])
-                # print("\t\tpoint f1:", self.slices[n+1].points[f1])
                 reordered_upper =  self.__Reordering(
                     self.slices[n],
                     f0)
