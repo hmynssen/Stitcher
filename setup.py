@@ -35,12 +35,15 @@ Version 1.2.2.1:
 Version 1.2.3:
     -NEW: Added Surface.self_intersection boolean property to report problematic surface build
 
+Version 1.3:
+    -Fix: remove_overlap was improved and now can handle multiple overlaps on the same spot
+
 '''
 
 from setuptools import setup, find_packages
 ##python3 setup.py sdist bdist_wheel
 ##twine upload dist/*
-VERSION = '1.2.3'
+VERSION = '1.3'
 DESCRIPTION = 'Stitcher - mesh builder'
 LONG_DESCRIPTION = __doc__
 setup(
