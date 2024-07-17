@@ -299,7 +299,7 @@ class Perimeter():
                         aux = copy.deepcopy(self.points[(i+1):(j+1)])
                         aux = np.flip(self.points[(i+1):(j+1)], axis=0)
                         self.points[i+1:j+1] = np.flip(self.points[(i+1):(j+1)], axis=0)
-
+                        self.area_vec()
                         if aux.size != 0:
                             for blends in range(self.blend_points.shape[0]):
                                 sup = np.copy(self.blend_points[blends])
