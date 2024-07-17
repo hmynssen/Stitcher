@@ -374,11 +374,10 @@ class Perimeter():
             p_i = self.points[i]
             for j in range(N):
                 p_j = other.points[j]
-                if (p_i-p_j).mod()<small_dist:
+                if (p_i-p_j).mod()<=small_dist:
                     small_dist = (p_i-p_j).mod()
                     best_p_i = i
                     best_p_j = j
-
         if not self.find_intersection(self.points[best_p_i],
                                   other.points[best_p_j],
                                   self.points[best_p_i+1],
@@ -388,7 +387,7 @@ class Perimeter():
             best_p_j = N - best_p_j
             
         vari = M+N+1
-        merged = np.array([Point(0,0,0)]*(vari))
+        merged = np.array([Point(0,0,0) for _ in range(vari)])
         delta = 0
         if best_p_i<M-1:
             for i in range(M):
