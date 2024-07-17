@@ -38,12 +38,15 @@ Version 1.2.3:
 Version 1.3:
     -Fix: remove_overlap was improved and now can handle multiple overlaps on the same spot
 
+Version 1.3.1:
+    -Fix: islands_ensemble now doesn't create self intersection anymore
+
 '''
 
 from setuptools import setup, find_packages
 ##python3 setup.py sdist bdist_wheel
 ##twine upload dist/*
-VERSION = '1.3'
+VERSION = '1.3.1'
 DESCRIPTION = 'Stitcher - mesh builder'
 LONG_DESCRIPTION = __doc__
 setup(
