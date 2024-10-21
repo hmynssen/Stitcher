@@ -41,12 +41,15 @@ Version 1.3:
 Version 1.3.1:
     -Fix: islands_ensemble now doesn't create self intersection anymore
 
+Version 1.3.2:
+    -Fix: fix_intersection in Perimiter class didn't update de area vector, now it does
+
 '''
 
 from setuptools import setup, find_packages
 ##python3 setup.py sdist bdist_wheel
 ##twine upload dist/*
-VERSION = '1.3.1'
+VERSION = '1.3.2'
 DESCRIPTION = 'Stitcher - mesh builder'
 LONG_DESCRIPTION = __doc__
 setup(
